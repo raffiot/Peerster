@@ -1,106 +1,13 @@
 <!doctype html>
 <html lang="en">
 	<head>
+		<meta charset="utf-8">
+		<title>PEERSTER</title>
 		<link rel="stylesheet" type="text/css" href="webpage.css">
-
 		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"/>
 		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
 		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
-
-		<script>
-			function send() {
-				var txt = document.getElementById("message").value;
-				if (txt.length > 0) {
-					$.ajax({
-						type: "POST",
-						url: "http://localhost:8080/message",
-						data: {value:txt}
-					})
-					.done(function(data) {
-						document.getElementById("message").value = ''
-					});
-				}
-			}
-
-
-			$(document).ready(function(){
-				$("button#send").click(function(e){
-					send();
-				});
-
-				$("#message").keydown(function(e) {
-					if (e.keyCode == 13) {
-						send();
-					}
-				});
-			});
-
-			$.ajax({
-				type: "GET",
-				url: "http://localhost:8080/id",
-				success: function(data,status,xhr){
-					var p = document.createElement("p");
-					var dataJSON = JSON.parse(data);
-					var text = document.createTextNode("ID : " + dataJSON.toString());
-					p.appendChild(text);
-					document.querySelector("#id-box").appendChild(text);
-				}
-			});
-
-			get_message_and_nodes();
-
-			setInterval(get_message_and_nodes, 2000);
-			function get_message_and_nodes(){
-				$.ajax({
-					type: "GET",
-					url: "http://localhost:8080/message",
-					success: function(data,status,xhr){
-						var out = document.querySelector("#msg-box");
-
-						const isScrolledToBottom = out.scrollHeight - out.clientHeight <= out.scrollTop + 1
-
-						document.querySelector("#msg-box").innerHTML = "";
-						var dataJSON = JSON.parse(data);
-						for (x in dataJSON) {
-							var p = document.createElement("p");
-							var msg = dataJSON[x.toString()];
-
-							var b = document.createElement("b");
-							b.appendChild(document.createTextNode(msg.Origin + " " + msg.ID  + " : "))
-
-							var text = document.createTextNode(msg.Text);
-							p.appendChild(b);
-							p.appendChild(text);
-							document.querySelector("#msg-box").appendChild(p);
-						}
-
-						// scroll to bottom if isScrolledToBottom is true
-						if (isScrolledToBottom) {
-							out.scrollTop = out.scrollHeight - out.clientHeight
-						}
-
-					}
-				});
-
-				$.ajax({
-					type: "GET",
-					url: "http://localhost:8080/node",
-					success: function(data,status,xhr){
-						document.querySelector("#peers-box").innerHTML = ""
-
-						var dataJSON = JSON.parse(data);
-						for(x in dataJSON){
-						var p = document.createElement("h5");
-							var text = document.createTextNode("");
-							var msg = dataJSON[x.toString()];
-							var text = document.createTextNode(x.toString());
-							p.appendChild(text);
-							document.querySelector("#peers-box").appendChild(p);
-						}
-					}
-				});
-			}
-		</script>
+		<script type="text/javascript" src="webpage.js"></script>
 	</head>
 
 	<body>
@@ -111,17 +18,25 @@
 		<div class="wrapper">
 		<div class="column peers">
 			<h3 class="title">Peers</h3>
-			<div id="peers-box">
-
+			<div class="messagePeer scrollable" id="peers-box">
 			</div>
+			<div class="input-group">
+			<input type="text" id="messagePeer" name="message" placeholder="Write peer id here..." class="form-control"/>
+			<span class="input-group-btn">
+				<button class="btn btn-default" type="submit" id="sendPeer">
+					<span class="glyphicon glyphicon-circle-arrow-right" aria-hidden="true"></span>
+				</button>
+			</span>
 		</div>
-		<div class="column message" id="msg-box">
+		</div>
+
+		<div class="column message scrollable" id="msg-box">
 
 		</div>
 
 		<div class="send">
 			<div class="input-group">
-				<input type="text" id="message" name="message" placeholder="Write here..." class="form-control"/>
+				<input type="text" id="message" name="message" placeholder="Write message here..." class="form-control"/>
 				<span class="input-group-btn">
 					<button class="btn btn-default" type="submit" id="send">
 						<span class="glyphicon glyphicon-circle-arrow-right" aria-hidden="true"></span>
@@ -131,4 +46,4 @@
 		</div>
 		</div>
 	</body>
-</html
+</html>
