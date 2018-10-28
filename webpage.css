@@ -1,0 +1,46 @@
+html, body {
+	height: 95%;
+	width: 100%;
+}
+
+.header {
+	height: 12%;
+}
+
+.wrapper {
+	height: 88%;
+}
+
+/* Create two unequal columns that floats next to each other */
+.column {
+    float: left;
+	height: 100%;
+    padding: 5%;
+	overflow-y: scroll;
+}
+
+.peers {
+	width: 25%;
+}
+
+.message {
+	width: 75%;
+	background: rgb(208, 240, 192);
+	padding-bottom: 0px;
+	overflow-wrap: break-word;
+}
+
+.send {
+	padding-left: 25%;
+}
+
+p {
+	margin: 15px 0px;
+	padding: 10px 10px;
+	background: #ffffff;
+	box-shadow: 0px 1px 4px rgba(0, 0, 0, .2);
+}
+
+.title {
+	color: rgb(11, 102, 35);
+}
