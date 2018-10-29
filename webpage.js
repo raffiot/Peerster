@@ -20,6 +20,7 @@ function send(type) {
       }
     });
   }
+  get_message_and_nodes()
 }
 
 
