@@ -1,12 +1,13 @@
 package main
 
-import(
-  "fmt"
-  "net"
-  "log"
-  "math/rand"
-  "time"
-  "github.com/dedis/protobuf"
+import (
+	"fmt"
+	"log"
+	"math/rand"
+	"net"
+	"time"
+
+	"github.com/dedis/protobuf"
 )
 
 /**
@@ -239,7 +240,7 @@ it also implement the anti-entropy process
 */
 func (g *Gossiper) receiveMessageFromGossiper() {
 	receivedInTime := false
-	tickerAEntropy := time.NewTicker(5 * time.Second)
+	tickerAEntropy := time.NewTicker(time.Duration(ANTI_ENTROPY_TIMER) * time.Second)
 	go func() {
 		for _ = range tickerAEntropy.C {
 			if !receivedInTime {
@@ -434,7 +435,7 @@ func (g *Gossiper) sendingRoutine(pkt *RumorMessage, dst *net.UDPAddr) {
 	select {
 	case res := <-ch:
 		g.StatusPacketRoutine(res, dst)
-	case <-time.After(1 * time.Second):
+	case <-time.After(time.Duration(TIMEOUT_TIMER) * time.Second):
 		rnd := rand.Int() % 2
 		if rnd == 0 {
 			newDst := g.chooseRandomPeer()
