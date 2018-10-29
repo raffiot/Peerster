@@ -50,7 +50,7 @@ sleep 1
 ./client/client -UIPort=12346 -msg=$message_c2_2
 ./client/client -UIPort=12351 -msg=$message_c3
 
-sleep 5
+sleep 10
 pkill -f Peerster
 
 
@@ -104,24 +104,29 @@ do
 
 	if [[ "$gossipPort" != 5004 ]] ; then
 		if !(grep -Eq "$msgLine1" "${outputFiles[$i]}") ; then
+					echo "$gossipPort didn't receive $msgLine1"
         	failed="T"
     	fi
 		if !(grep -Eq "$msgLine2" "${outputFiles[$i]}") ; then
+					echo "$gossipPort didn't receive $msgLine2"
         	failed="T"
     	fi
 	fi
 
 	if [[ "$gossipPort" != 5001 ]] ; then
 		if !(grep -Eq "$msgLine3" "${outputFiles[$i]}") ; then
+					echo "$gossipPort didn't receive $msgLine3"
         	failed="T"
     	fi
 		if !(grep -Eq "$msgLine4" "${outputFiles[$i]}") ; then
+					echo "$gossipPort didn't receive $msgLine4"
         	failed="T"
     	fi
 	fi
 
 	if [[ "$gossipPort" != 5006 ]] ; then
 		if !(grep -Eq "$msgLine5" "${outputFiles[$i]}") ; then
+					echo "$gossipPort didn't receive $msgLine5"
         	failed="T"
     	fi
 	fi

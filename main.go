@@ -129,7 +129,7 @@ func flippedCoin(sender *net.UDPAddr) {
 /**
 Print our neighbouring peers
 */
-func listAllKnownPeers(g *Gossiper) {
+func (g *Gossiper) listAllKnownPeers() {
 	fmt.Print("PEERS ")
 	mutex.Lock()
 	for k := range g.set_of_peers {
@@ -194,7 +194,7 @@ Routine that handle the messages that we receive from the client
 at <127.0.0.1:ClientPort>
 We handle only the GossipPacket of type SimpleMessage
 */
-func receiveMessageFromClient(g *Gossiper) {
+func (g *Gossiper) receiveMessageFromClient() {
 
 	defer g.clientConn.Close()
 
@@ -205,7 +205,7 @@ func receiveMessageFromClient(g *Gossiper) {
 		protobuf.Decode(b, &pkt)
 		if nb_byte_written > 0 && err == nil {
 			if pkt.Simple != nil {
-				handleSimplePacket(pkt.Simple, g)
+				g.handleSimplePacket(pkt.Simple)
 			} else {
 				fmt.Println("Error client send packet with type different than simple message.")
 			}
@@ -221,7 +221,7 @@ if we aren't in simple mode:
 	We take from the vector clock datastructure the ID of this new message
 	We send this message as RumorMessage to the gossiper connexion
 */
-func handleSimplePacket(pkt *SimpleMessage, g *Gossiper) {
+func (g *Gossiper) handleSimplePacket(pkt *SimpleMessage) {
 	fmt.Println("CLIENT MESSAGE " + pkt.Contents)
 	if g.simple {
 		newPkt := GossipPacket{Simple: &SimpleMessage{
@@ -235,7 +235,7 @@ func handleSimplePacket(pkt *SimpleMessage, g *Gossiper) {
 			fmt.Println("Encode of the packet failed")
 			log.Fatal(err)
 		}
-		listAllKnownPeers(g)
+		g.listAllKnownPeers()
 		mutex.Lock()
 		for k := range g.set_of_peers {
 			dst, err := net.ResolveUDPAddr("udp4", k)
@@ -277,7 +277,7 @@ This function handle SimpleMessage from other gossipers
 	if we don't know the sender we add him to our list of peers
 	we send this message to our peers except the sender
 */
-func handleSimplePacketG(pkt *SimpleMessage, sender *net.UDPAddr, g *Gossiper) {
+func (g *Gossiper) handleSimplePacketG(pkt *SimpleMessage, sender *net.UDPAddr) {
 	sender_formatted := ParseIPStr(sender)
 	fmt.Println("SIMPLE MESSAGE origin " + pkt.OriginalName + " from " +
 		sender_formatted + " contents " + pkt.Contents)
@@ -294,7 +294,7 @@ func handleSimplePacketG(pkt *SimpleMessage, sender *net.UDPAddr, g *Gossiper) {
 		fmt.Println("cannot encode message")
 		log.Fatal(err)
 	}
-	listAllKnownPeers(g)
+	g.listAllKnownPeers()
 	mutex.Lock()
 	for k := range g.set_of_peers {
 		if k != sender_formatted {
@@ -317,14 +317,14 @@ it also implement the anti-entropy process
 	if the packet is a StatusPacket we call StatusPacketRoutine
 	if the packet is a RumorMessage we call rumorMessageRoutine
 */
-func receiveMessageFromGossiper(g *Gossiper) {
+func (g *Gossiper) receiveMessageFromGossiper() {
 	receivedInTime := false
 	ticker := time.NewTicker(1 * time.Second)
 	go func() {
 		for _ = range ticker.C {
 			if !receivedInTime {
-				dst := chooseRandomPeer(g)
-				sendMyStatus(dst, g, 0)
+				dst := g.chooseRandomPeer()
+				g.sendMyStatus(dst, 0)
 			}
 		}
 	}()
@@ -356,15 +356,15 @@ func receiveMessageFromGossiper(g *Gossiper) {
 			}
 			mutex.Unlock()
 			if pkt.Simple != nil {
-				handleSimplePacketG(pkt.Simple, res.sender, g)
+				g.handleSimplePacketG(pkt.Simple, res.sender)
 			} else if pkt.Status != nil {
-				StatusPacketRoutine(pkt.Status, res.sender, g)
+				g.StatusPacketRoutine(pkt.Status, res.sender)
 			} else if pkt.Rumor != nil {
 				if sender_formatted != ParseIPStr(g.udp_address) {
 					printRumorMessageRcv(pkt.Rumor, res.sender)
-					listAllKnownPeers(g)
+					g.listAllKnownPeers()
 				}
-				rumorMessageRoutine(pkt.Rumor, res.sender, g)
+				g.rumorMessageRoutine(pkt.Rumor, res.sender)
 			}
 		}
 	}
@@ -377,8 +377,7 @@ it return two booleans
 alreadyHave: true if we already have the pkt in our archives
 notAdded: true if the packet has an id too high so we miss RumorMessage before that one
 */
-func updateArchivesVC(pkt *RumorMessage, sender *net.UDPAddr, g *Gossiper) (bool, bool) {
-
+func (g *Gossiper) updateArchivesVC(pkt *RumorMessage, sender *net.UDPAddr) (bool, bool) {
 	var containSender bool = false
 	var alreadyHave bool = false
 	var notAdded bool = false
@@ -435,16 +434,16 @@ This function is called to answer correctly to the received RumorMessage
 we send our Status to the sender of the RumorMessage only if the sender is not ourselves
 if the message interested us we monger it.
 */
-func rumorMessageRoutine(pkt *RumorMessage, sender *net.UDPAddr, g *Gossiper) {
+func (g *Gossiper) rumorMessageRoutine(pkt *RumorMessage, sender *net.UDPAddr) {
 
-	alreadyHave, notAdded := updateArchivesVC(pkt, sender, g)
+	alreadyHave, notAdded := g.updateArchivesVC(pkt, sender)
 	if ParseIPStr(sender) != ParseIPStr(g.udp_address) {
-		sendMyStatus(sender, g, 0)
+		g.sendMyStatus(sender, 0)
 	}
 
 	if !alreadyHave && !notAdded {
-		newDst := chooseRandomPeer(g)
-		sendingRoutine(pkt, newDst, g)
+		newDst := g.chooseRandomPeer()
+		g.sendingRoutine(pkt, newDst)
 	}
 
 	return
@@ -453,9 +452,9 @@ func rumorMessageRoutine(pkt *RumorMessage, sender *net.UDPAddr, g *Gossiper) {
 /**
 This function return the UDPAddr of a peer chose randomly
 */
-func chooseRandomPeer(g *Gossiper) *net.UDPAddr {
+func (g *Gossiper) chooseRandomPeer() *net.UDPAddr {
 	mutex.Lock()
-	r := rand.Int() % len(g.set_of_peers)
+	r := rand.Intn(len(g.set_of_peers))
 	i := 0
 	var addr *net.UDPAddr
 	for k := range g.set_of_peers {
@@ -472,7 +471,7 @@ func chooseRandomPeer(g *Gossiper) *net.UDPAddr {
 This function send the rumor message to peer dst and wait for an ack from him
 if we receive an ack we send the rumor to another random peer
 */
-func sendingRoutine(pkt *RumorMessage, dst *net.UDPAddr, g *Gossiper) {
+func (g *Gossiper) sendingRoutine(pkt *RumorMessage, dst *net.UDPAddr) {
 
 	pktNew := GossipPacket{Rumor: &RumorMessage{
 		Origin: pkt.Origin,
@@ -494,13 +493,13 @@ func sendingRoutine(pkt *RumorMessage, dst *net.UDPAddr, g *Gossiper) {
 	go receivePkt(ch, dst, g.conn)
 	select {
 	case res := <-ch:
-		StatusPacketRoutine(res, dst, g)
+		g.StatusPacketRoutine(res, dst)
 	case <-time.After(1 * time.Second):
 		rnd := rand.Int() % 2
 		if rnd == 0 {
-			newDst := chooseRandomPeer(g)
+			newDst := g.chooseRandomPeer()
 			flippedCoin(newDst)
-			sendingRoutine(pkt, newDst, g)
+			g.sendingRoutine(pkt, newDst)
 		}
 	}
 
@@ -517,7 +516,7 @@ func receivePkt(out chan<- *StatusPacket, senderExpected *net.UDPAddr, conn *net
 			if ParseIPStr(sender) == ParseIPStr(senderExpected) {
 				out <- pkt.Status
 			}
-		}
+		} // BE CAREFULL HERE WE SOMETIME THROW AWAY RUMOR PACKET
 	}
 	return
 }
@@ -528,9 +527,9 @@ numberToAsk represent the number of message that we don't already have
 if numberToAsk > 0 then we send our status to the sender
 if sender missed packet we send the Rumor message missed
 */
-func StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr, g *Gossiper) {
+func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 	printStatusMessageRcv(pkt, sender)
-	listAllKnownPeers(g)
+	g.listAllKnownPeers()
 	vco := pkt.Want
 	var vcm []PeerStatus
 	mutex.Lock()
@@ -554,7 +553,7 @@ func StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr, g *Gossiper) {
 			if elemM.Identifier == elemO.Identifier {
 				contains = true
 				if elemM.NextID > elemO.NextID {
-					sendUpdate(elemO, sender, g)
+					g.sendUpdate(elemO, sender)
 				} else if elemM.NextID < elemO.NextID {
 					numberToAsk += int(elemO.NextID) - int(elemM.NextID)
 				}
@@ -565,7 +564,7 @@ func StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr, g *Gossiper) {
 				Identifier: elemM.Identifier,
 				NextID:     1,
 			}
-			sendUpdate(p, sender, g)
+			g.sendUpdate(p, sender)
 		}
 	}
 
@@ -583,7 +582,7 @@ func StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr, g *Gossiper) {
 		}
 	}
 	if numberToAsk > 0 {
-		sendMyStatus(sender, g, numberToAsk)
+		g.sendMyStatus(sender, numberToAsk)
 	} else {
 		fmt.Println("IN SYNC WITH " + ParseIPStr(sender))
 	}
@@ -593,7 +592,7 @@ func StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr, g *Gossiper) {
 /**
 Send our status and wait for numberToAsk messages to arrive so we are up to date
 */
-func sendMyStatus(sender *net.UDPAddr, g *Gossiper, numberToAsk int) {
+func (g *Gossiper) sendMyStatus(sender *net.UDPAddr, numberToAsk int) {
 	var w []PeerStatus
 	mutex.Lock()
 	for i := 0; i < len(g.vector_clock); i++ {
@@ -612,6 +611,7 @@ func sendMyStatus(sender *net.UDPAddr, g *Gossiper, numberToAsk int) {
 		fmt.Println("Encode of the packet failed")
 		log.Fatal(err)
 	}
+
 	mutex.Lock()
 	g.conn.WriteToUDP(pktByte, sender)
 	mutex.Unlock()
@@ -623,7 +623,9 @@ func sendMyStatus(sender *net.UDPAddr, g *Gossiper, numberToAsk int) {
 		if nb_byte_written > 0 && err == nil {
 			protobuf.Decode(b, &pkt)
 			if pkt.Rumor != nil {
-				updateArchivesVC(pkt.Rumor, sender, g)
+				printRumorMessageRcv(pkt.Rumor, sender)
+				g.listAllKnownPeers()
+				g.updateArchivesVC(pkt.Rumor, sender)
 			}
 		}
 	}
@@ -632,7 +634,7 @@ func sendMyStatus(sender *net.UDPAddr, g *Gossiper, numberToAsk int) {
 /**
 We send the rumor messages from a specific origin the sender doesn't have yet
 */
-func sendUpdate(pDefault PeerStatus, sender *net.UDPAddr, g *Gossiper) {
+func (g *Gossiper) sendUpdate(pDefault PeerStatus, sender *net.UDPAddr) {
 
 	mutex.Lock()
 	my_message := g.archives
@@ -682,9 +684,9 @@ func main() {
 
 	me = NewGossiper(*gossipAddr, *name, strings.Split(*peers, ","), *simple, client_ip+":"+*uiport)
 
-	go receiveMessageFromClient(me)
+	go me.receiveMessageFromClient()
 	if *server {
-		go receiveMessageFromGossiper(me)
+		go me.receiveMessageFromGossiper()
 		http.HandleFunc("/message", MessageHandler)
 		http.HandleFunc("/node", NodeHandler)
 		http.HandleFunc("/id", IdHandler)
@@ -693,7 +695,7 @@ func main() {
 			panic(err)
 		}
 	} else {
-		receiveMessageFromGossiper(me)
+		me.receiveMessageFromGossiper()
 	}
 
 }
