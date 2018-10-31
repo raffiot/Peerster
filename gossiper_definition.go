@@ -8,9 +8,18 @@ import (
 )
 
 type GossipPacket struct {
-	Simple *SimpleMessage
-	Rumor  *RumorMessage
-	Status *StatusPacket
+	Simple  *SimpleMessage
+	Rumor   *RumorMessage
+	Status  *StatusPacket
+	Private *PrivateMessage
+}
+
+type PrivateMessage struct {
+	Origin      string
+	ID          uint32
+	Text        string
+	Destination string
+	HopLimit    uint32
 }
 
 /**

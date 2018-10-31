@@ -10,7 +10,8 @@ import (
 )
 
 type GossipPacket struct {
-	Simple *SimpleMessage
+	Simple  *SimpleMessage
+	Private *PrivateMessage
 }
 
 type SimpleMessage struct {
@@ -19,19 +20,39 @@ type SimpleMessage struct {
 	Contents      string
 }
 
+type PrivateMessage struct {
+	Origin      string
+	ID          uint32
+	Text        string
+	Destination string
+	HopLimit    uint32
+}
+
 func main() {
 	gossiperAddr := "127.0.0.1"
 	uiport := flag.String("UIPort", "8080", "port for the UI client (default \"8080\")")
+	dest := flag.String("dest", "", "destination for the private message")
 	msg := flag.String("msg", "", "message to be send")
 	clientport := flag.String("ClientPort", "10010", "port for the client to communicate with gossiper (default \"10010\")")
 
 	flag.Parse()
+	var pkt_to_enc GossipPacket
+	if *dest != "" && *msg != "" {
+		pkt_to_enc = GossipPacket{Private: &PrivateMessage{
+			Origin:      "",
+			ID:          0,
+			Text:        *msg,
+			Destination: *dest,
+			HopLimit:    0,
+		}}
+	} else {
+		pkt_to_enc = GossipPacket{Simple: &SimpleMessage{
+			OriginalName:  "client",
+			RelayPeerAddr: "",
+			Contents:      *msg,
+		}}
+	}
 
-	pkt_to_enc := GossipPacket{&SimpleMessage{
-		OriginalName:  "client",
-		RelayPeerAddr: "",
-		Contents:      *msg,
-	}}
 	packetBytes, err := protobuf.Encode(&pkt_to_enc)
 
 	if err != nil {

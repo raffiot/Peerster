@@ -69,9 +69,28 @@ func (g *Gossiper) receiveMessageFromClient() {
 		if nb_byte_written > 0 && err == nil {
 			if pkt.Simple != nil {
 				g.handleSimplePacket(pkt.Simple)
+			} else if pkt.Private != nil{
+        mutex.Lock()
+        newPkt := GossipPacket{Private: &PrivateMessage{
+    			Origin:      g.Name,
+    			ID:          0,
+    			Text:        pkt.Private.Text,
+    			Destination: pkt.Private.Destination,
+    			HopLimit:    HOP_LIMIT,
+    		}}
+        next_hop := ParseStrIP(g.DSDV[pkt.Private.Destination])
+        mutex.Unlock()
+        pktByte, err := protobuf.Encode(&newPkt)
+    		if err != nil {
+    			fmt.Println("Encode of the packet failed")
+    			log.Fatal(err)
+    		}
+        mutex.Lock()
+    		g.conn.WriteToUDP(pktByte, g.udp_address)
+    		mutex.Unlock()
 			} else {
-				fmt.Println("Error client send packet with type different than simple message.")
-			}
+        fmt.Println("Error client send packet with type different than simple message or private message.")
+      }
 		}
 	}
 }
@@ -296,7 +315,9 @@ func (g *Gossiper) receiveMessageFromGossiper() {
 					g.listAllKnownPeers()
 				}
 				g.rumorMessageRoutine(pkt.Rumor, res.sender)
-			}
+			} else if pkt.Private != nil {
+        g.privateMessageRoutine(pkt.Private)
+      }
 		}
 	}
 	return
@@ -365,6 +386,40 @@ func (g *Gossiper) updateArchivesVC(pkt *RumorMessage, sender *net.UDPAddr) (boo
 	mutex.Unlock()
 
 	return alreadyHave, notAdded
+}
+
+func (g *Gossiper) privateMessageRoutine(pkt *PrivateMessage){
+  mutex.Lock()
+  name := g.Name
+  mutex.Unlock()
+  if pkt.Destination == name{
+    //APPEND TO PRIVATE ARCHIVES
+  } else {
+    mutex.Lock()
+    dst,ok := g.DSDV[pkt.Destination]
+    mutex.Unlock()
+    if !ok {
+      fmt.Println("Cannot forward message because destination unknown")
+    } else {
+      newPkt := GossipPacket{Private: &PrivateMessage{
+        Origin:      pkt.Origin,
+        ID:          0,
+        Text:        pkt.Text,
+        Destination: pkt.Destination,
+        HopLimit:    pkt.HopLimit - 1,
+      }}
+      if newPkt.Private.HopLimit > 0 {
+        pktByte, err := protobuf.Encode(&newPkt)
+        if err != nil {
+          fmt.Println("Encode of the packet failed")
+          log.Fatal(err)
+        }
+        mutex.Lock()
+        g.conn.WriteToUDP(pktByte, g.udp_address)
+        mutex.Unlock()
+      }
+    }
+  }
 }
 
 /**
