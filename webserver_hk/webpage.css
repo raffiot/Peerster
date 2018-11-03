@@ -1,0 +1,65 @@
+
+html, body {
+	height: 95%;
+	width: 100%;
+}
+
+.header {
+	height: 5%;
+}
+
+.wrapper {
+	padding:5%;
+	height:100%;
+	width:100%;
+}
+
+.column {
+    float: left;
+	height: 100%;
+    padding: 5%;
+}
+
+.left{
+	width:40%;
+}
+
+.right{
+	width:60%;
+}
+
+.line {
+	height: 50%;	
+}
+
+.scrollable {
+	overflow-y: scroll;
+}
+
+.pane {
+	height: 70%;
+	background: rgb(208, 240, 192);
+	overflow-wrap: break-word;
+	
+}
+
+.messagepane {
+	height:90%;
+	background: rgb(208, 240, 192);
+	overflow-wrap: break-word;
+	
+}
+
+.verticalLine {
+  border-left: 1px solid #ccc;
+}
+.horizontalLine{
+	border-top: 1px solid #ccc;
+}
+
+p {
+	margin: 15px 20px !important;
+	padding: 10px 10px;
+	background: #ffffff;
+	box-shadow: 0px 1px 4px rgba(0, 0, 0, .2);
+}

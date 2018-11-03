@@ -31,11 +31,13 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 
 	var s []PeerStatus
 	var a []PeerMessage
+	var pa = make(map[string][]string)
 
 	elementMap := make(map[string]bool)
 	for i := 0; i < len(peers); i++ {
 		elementMap[peers[i]] = true
 	}
+	fmt.Println(elementMap)
 	dsdv := make(map[string]string)
 	return &Gossiper{
 		udp_address:  udpAddr,
@@ -44,6 +46,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		set_of_peers: elementMap,
 		vector_clock: s,
 		archives:     a,
+		archives_private: pa,
 		DSDV:         dsdv,
 		simple:       simple,
 		clientConn:   udpConnClient,
@@ -67,29 +70,37 @@ func (g *Gossiper) receiveMessageFromClient() {
 		nb_byte_written, _, err := g.clientConn.ReadFromUDP(b)
 		protobuf.Decode(b, &pkt)
 		if nb_byte_written > 0 && err == nil {
+		fmt.Println(pkt.Simple != nil)
+		fmt.Println(pkt.Private != nil)
 			if pkt.Simple != nil {
 				g.handleSimplePacket(pkt.Simple)
 			} else if pkt.Private != nil{
-        mutex.Lock()
-        newPkt := GossipPacket{Private: &PrivateMessage{
-    			Origin:      g.Name,
-    			ID:          0,
-    			Text:        pkt.Private.Text,
-    			Destination: pkt.Private.Destination,
-    			HopLimit:    HOP_LIMIT,
-    		}}
-        next_hop := ParseStrIP(g.DSDV[pkt.Private.Destination])
-        mutex.Unlock()
-        pktByte, err := protobuf.Encode(&newPkt)
-    		if err != nil {
-    			fmt.Println("Encode of the packet failed")
-    			log.Fatal(err)
-    		}
-        mutex.Lock()
-    		g.conn.WriteToUDP(pktByte, g.udp_address)
-    		mutex.Unlock()
+				mutex.Lock()
+				newPkt := GossipPacket{Private: &PrivateMessage{
+						Origin:      g.Name,
+						ID:          0,
+						Text:        pkt.Private.Text,
+						Destination: pkt.Private.Destination,
+						HopLimit:    HOP_LIMIT,
+					}}
+				next_hop,ok := g.DSDV[pkt.Private.Destination]
+				mutex.Unlock()
+				if ok{					
+					pktByte, err := protobuf.Encode(&newPkt)
+					if err != nil {
+						fmt.Println("Encode of the packet failed")
+						log.Fatal(err)
+					}
+					mutex.Lock()
+					g.conn.WriteToUDP(pktByte,  ParseStrIP(next_hop))
+					mutex.Unlock()
+					fmt.Println("private message send")
+				} else {
+					fmt.Println("destination unknown for private message")
+				}
 			} else {
-        fmt.Println("Error client send packet with type different than simple message or private message.")
+				fmt.Println(pkt.Private)
+				fmt.Println("Error client send packet with type different than simple message or private message.")
       }
 		}
 	}
@@ -262,7 +273,7 @@ func (g *Gossiper) receiveMessageFromGossiper() {
 	tickerAEntropy := time.NewTicker(time.Duration(ANTI_ENTROPY_TIMER) * time.Second)
 	go func() {
 		for _ = range tickerAEntropy.C {
-			if !receivedInTime {
+			if !receivedInTime && len(g.set_of_peers) >0{
 				dst := g.chooseRandomPeer()
 				g.sendMyStatus(dst, 0)
 			}
@@ -273,8 +284,10 @@ func (g *Gossiper) receiveMessageFromGossiper() {
 		tickerRouting := time.NewTicker(time.Duration(g.rtimer) * time.Second)
 		go func() {
 			for _ = range tickerRouting.C {
-				dst := g.chooseRandomPeer()
-				g.sendRouteRumor(dst)
+				if len(g.set_of_peers) >0{
+					dst := g.chooseRandomPeer()
+					g.sendRouteRumor(dst)
+				}
 			}
 		}()
 	}
@@ -316,8 +329,8 @@ func (g *Gossiper) receiveMessageFromGossiper() {
 				}
 				g.rumorMessageRoutine(pkt.Rumor, res.sender)
 			} else if pkt.Private != nil {
-        g.privateMessageRoutine(pkt.Private)
-      }
+				g.privateMessageRoutine(pkt.Private)
+			}
 		}
 	}
 	return
@@ -377,23 +390,30 @@ func (g *Gossiper) updateArchivesVC(pkt *RumorMessage, sender *net.UDPAddr) (boo
 			msgs:       a,
 		})
 	}
-
+	fmt.Println("hi")
 	if !alreadyHave && ParseIPStr(sender) != ParseIPStr(g.udp_address) {
 		g.DSDV[pkt.Origin] = ParseIPStr(sender)
 		fmt.Println("DSDV " + pkt.Origin + " " + ParseIPStr(sender))
 	}
-
+	
+	
 	mutex.Unlock()
-
 	return alreadyHave, notAdded
 }
 
 func (g *Gossiper) privateMessageRoutine(pkt *PrivateMessage){
+fmt.Println(" private message routine")
   mutex.Lock()
   name := g.Name
   mutex.Unlock()
   if pkt.Destination == name{
-    //APPEND TO PRIVATE ARCHIVES
+	_,ok := g.archives_private[pkt.Origin]
+	if !ok {
+		var new_array []string
+		g.archives_private[pkt.Origin] = new_array
+	}
+	printPrivateMessageRcv(pkt)
+    g.archives_private[pkt.Origin] = append(g.archives_private[pkt.Origin],pkt.Text)
   } else {
     mutex.Lock()
     dst,ok := g.DSDV[pkt.Destination]
@@ -415,7 +435,7 @@ func (g *Gossiper) privateMessageRoutine(pkt *PrivateMessage){
           log.Fatal(err)
         }
         mutex.Lock()
-        g.conn.WriteToUDP(pktByte, g.udp_address)
+        g.conn.WriteToUDP(pktByte, ParseStrIP(dst))
         mutex.Unlock()
       }
     }
@@ -434,7 +454,7 @@ func (g *Gossiper) rumorMessageRoutine(pkt *RumorMessage, sender *net.UDPAddr) {
 		g.sendMyStatus(sender, 0)
 	}
 
-	if !alreadyHave && !notAdded {
+	if !alreadyHave && !notAdded && len(g.set_of_peers) >0{
 		newDst := g.chooseRandomPeer()
 		g.sendingRoutine(pkt, newDst)
 	}
@@ -484,7 +504,14 @@ func (g *Gossiper) sendingRoutine(pkt *RumorMessage, dst *net.UDPAddr) {
 	mutex.Lock()
 	g.conn.WriteToUDP(pktByte, dst)
 	mutex.Unlock()
-
+	/**
+	rnd := rand.Int() % 2
+	if rnd == 0 {
+			newDst := g.chooseRandomPeer()
+			flippedCoin(newDst)
+			g.sendingRoutine(pkt, newDst)
+		}*/
+	
 	ch := make(chan *StatusPacket, 1)
 	go receivePkt(ch, dst, g.conn)
 	select {
@@ -492,7 +519,7 @@ func (g *Gossiper) sendingRoutine(pkt *RumorMessage, dst *net.UDPAddr) {
 		g.StatusPacketRoutine(res, dst)
 	case <-time.After(time.Duration(TIMEOUT_TIMER) * time.Second):
 		rnd := rand.Int() % 2
-		if rnd == 0 {
+		if rnd == 0 && len(g.set_of_peers) > 0{
 			newDst := g.chooseRandomPeer()
 			flippedCoin(newDst)
 			g.sendingRoutine(pkt, newDst)

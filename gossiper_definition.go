@@ -14,14 +14,6 @@ type GossipPacket struct {
 	Private *PrivateMessage
 }
 
-type PrivateMessage struct {
-	Origin      string
-	ID          uint32
-	Text        string
-	Destination string
-	HopLimit    uint32
-}
-
 /**
 udp_address: Gossiper udp address
 conn: Gossiper-other gossiper udp connexion
@@ -43,6 +35,7 @@ type Gossiper struct {
 	set_of_peers map[string]bool
 	vector_clock []PeerStatus
 	archives     []PeerMessage
+	archives_private map[string][]string
 	DSDV         map[string]string
 	simple       bool
 	clientConn   *net.UDPConn
@@ -62,6 +55,14 @@ type RumorMessage struct {
 	Text   string
 }
 
+type PrivateMessage struct {
+	Origin      string
+	ID          uint32
+	Text        string
+	Destination string
+	HopLimit    uint32
+}
+
 type PeerStatus struct {
 	Identifier string
 	NextID     uint32
@@ -75,6 +76,7 @@ type PeerMessage struct {
 	Identifier string
 	msgs       map[uint32]*RumorMessage
 }
+
 
 type UDPPacket struct {
 	bytes   []byte
@@ -149,6 +151,11 @@ func printRumorMessageRcv(pkt *RumorMessage, sender *net.UDPAddr) {
 	str := fmt.Sprint(pkt.ID)
 	fmt.Println("RUMOR origin " + pkt.Origin + " from " + ParseIPStr(sender) + " ID " +
 		str + " contents " + pkt.Text)
+}
+
+func printPrivateMessageRcv(pkt *PrivateMessage) {
+	str := fmt.Sprint(pkt.HopLimit)
+	fmt.Println("PRIVATE origin "+pkt.Origin+" hop-limit "+ str +" contents "+pkt.Text)
 }
 
 func (g *Gossiper) printDSDV() {

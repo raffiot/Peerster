@@ -3,7 +3,7 @@ package main
 import (
 	"encoding/json"
 	"net/http"
-
+	"fmt"
 	"github.com/dedis/protobuf"
 )
 
@@ -11,7 +11,6 @@ func MessageHandler(w http.ResponseWriter, r *http.Request) {
 	enableCors(&w)
 	if r.Method == "GET" {
 		var values []RumorMessage
-		w.WriteHeader(http.StatusOK)
 		mutex.Lock()
 		for i := 0; i < len(me.archives); i++ {
 			finished := false
@@ -30,7 +29,9 @@ func MessageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		mutex.Unlock()
 		jsonValue, _ := json.Marshal(values)
+		w.WriteHeader(http.StatusOK)
 		w.Write(jsonValue)
+		
 	} else if r.Method == "POST" {
 		err := r.ParseForm()
 		if err != nil {
@@ -51,11 +52,11 @@ func MessageHandler(w http.ResponseWriter, r *http.Request) {
 func NodeHandler(w http.ResponseWriter, r *http.Request) {
 	enableCors(&w)
 	if r.Method == "GET" {
-		w.WriteHeader(http.StatusOK)
 		mutex.Lock()
 		values := me.set_of_peers
 		mutex.Unlock()
 		jsonValue, _ := json.Marshal(values)
+		w.WriteHeader(http.StatusOK)
 		w.Write(jsonValue)
 	} else if r.Method == "POST" {
 		err := r.ParseForm()
@@ -75,6 +76,40 @@ func IdHandler(w http.ResponseWriter, r *http.Request) {
 	jsonValue, _ := json.Marshal(values)
 	w.Write(jsonValue)
 }
+
+func PeerHandler(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+	w.WriteHeader(http.StatusOK)
+	mutex.Lock()
+	keys := make([]string, 0, len(me.DSDV))
+	for k := range me.DSDV {
+        keys = append(keys, k)
+    }
+	mutex.Unlock()
+	jsonValue, _ := json.Marshal(keys)
+	w.Write(jsonValue)
+}
+
+func PrivateMessageHandler(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+	w.WriteHeader(http.StatusOK)
+	
+	var peer string
+	for k := range r.URL.Query() {
+        peer = k
+    }
+	
+	mutex.Lock()
+	fmt.Println(me.archives_private)
+	keys := make([]string, 0, len(me.archives_private[peer]))
+	for _,k := range me.archives_private[peer] {
+        keys = append(keys, k)
+    }
+	mutex.Unlock()
+	jsonValue, _ := json.Marshal(keys)
+	w.Write(jsonValue)
+}
+
 func enableCors(w *http.ResponseWriter) {
 	(*w).Header().Set("Access-Control-Allow-Origin", "*")
 }

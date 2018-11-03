@@ -10,7 +10,7 @@ import (
 var UDP_PACKET_SIZE = 2048
 var ANTI_ENTROPY_TIMER = 1 //Second
 var TIMEOUT_TIMER = 1      //Second
-var HOP_LIMIT = 10
+var HOP_LIMIT = uint32(10)
 var me *Gossiper
 var mutex sync.Mutex
 
@@ -24,8 +24,14 @@ func main() {
 	simple := flag.Bool("simple", false, "run gossiper in simple broadcast mode")
 	server := flag.Bool("server", false, " run the server")
 	flag.Parse()
-
-	me = NewGossiper(*gossipAddr, *name, strings.Split(*peers, ","), *simple, client_ip+":"+*uiport, *rtimer)
+	
+	var peers_tab []string
+	if *peers != ""{
+		peers_tab = strings.Split(*peers, ",")
+	}
+	
+	
+	me = NewGossiper(*gossipAddr, *name, peers_tab, *simple, client_ip+":"+*uiport, *rtimer)
 
 	if *rtimer > 0 {
 		dst := me.chooseRandomPeer()
@@ -38,6 +44,8 @@ func main() {
 		http.HandleFunc("/message", MessageHandler)
 		http.HandleFunc("/node", NodeHandler)
 		http.HandleFunc("/id", IdHandler)
+		http.HandleFunc("/peer", PeerHandler)
+		http.HandleFunc("/private", PrivateMessageHandler)
 
 		if err := http.ListenAndServe("localhost:8080", nil); err != nil {
 			panic(err)

@@ -11,6 +11,8 @@ import (
 
 type GossipPacket struct {
 	Simple  *SimpleMessage
+	Rumor   *RumorMessage
+	Status  *StatusPacket
 	Private *PrivateMessage
 }
 
@@ -20,12 +22,27 @@ type SimpleMessage struct {
 	Contents      string
 }
 
+type RumorMessage struct {
+	Origin string
+	ID     uint32
+	Text   string
+}
+
 type PrivateMessage struct {
 	Origin      string
 	ID          uint32
 	Text        string
 	Destination string
 	HopLimit    uint32
+}
+
+type PeerStatus struct {
+	Identifier string
+	NextID     uint32
+}
+
+type StatusPacket struct {
+	Want []PeerStatus
 }
 
 func main() {
@@ -45,6 +62,7 @@ func main() {
 			Destination: *dest,
 			HopLimit:    0,
 		}}
+		fmt.Println("send private")
 	} else {
 		pkt_to_enc = GossipPacket{Simple: &SimpleMessage{
 			OriginalName:  "client",

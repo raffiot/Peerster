@@ -1,6 +1,7 @@
 
 function send(type) {
   var txt;
+ 
   if (type === "message"){
     txt = document.getElementById("message").value;
   } else{
@@ -20,7 +21,9 @@ function send(type) {
       }
     });
   }
+  
   get_message_and_nodes()
+  
 }
 
 
@@ -44,6 +47,9 @@ $(document).ready(function(){
       send("node");
     }
   });
+);
+  add_peer_btn = document.getElementById("appendPeer");
+add_peer_btn
 });
 
 $.ajax({
@@ -60,7 +66,7 @@ $.ajax({
 
 get_message_and_nodes();
 
-setInterval(get_message_and_nodes, 2000);
+setInterval(get_message_and_nodes, 1000);
 function get_message_and_nodes(){
   $.ajax({
     type: "GET",
@@ -111,3 +117,5 @@ function get_message_and_nodes(){
     }
   });
 }
+
+

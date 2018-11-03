@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+	<head>
+		<meta charset="utf-8">
+		<title>PEERSTER</title>
+		<link rel="stylesheet" type="text/css" href="webpage.css">
+		<link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css"/>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js"></script>
+		<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js"></script>
+		<script type="text/javascript" src="webpage.js"></script>
+	</head>
+
+	<body>
+		<div class="header">
+		<center><h1 id="title" class="title">Peerster</h1></center>
+		</div>
+		<div class="wrapper">
+			<div class="column left">
+				<div class="line">
+					<label class="sub_title">Peers</label>
+					<button class="btn btn-default" id="appendPeer">Ajouter</Button>
+					
+					<div class="pane scrollable" id="peers-box">
+					</div>
+				</div>
+				
+				<div class="line horizontalLine">
+					<label class="sub_title">Dicussions</label>
+					<div class="pane scrollable" id="discussions-box">
+					</div>
+				</div>
+			</div>
+			
+			<div class="column right verticalLine">
+				
+				<div class="messagepane scrollable" id="msg-box">
+				</div>
+				<div class="input-group">
+					<input  type="text" id="message" placeholder="Write message here..." class="form-control" />
+					<span class="input-group-btn">
+					<button class="btn btn-default" type="submit" id="send">
+						<span class="glyphicon glyphicon-circle-arrow-right" aria-hidden="true"></span>
+					</button>
+				</span>
+				</div>
+			</div>
+		</div>
+	</body>
+</html>
