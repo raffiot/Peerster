@@ -1,25 +1,28 @@
 var private_msg = false;
 var private_id = "";
 
-		
-function send(type, message) {
-  
 
-  if (message.length > 0) {
+function send(type, msg) {
+	var d;
+	if(type === "private"){
+		d = {message:msg,destination:private_id}
+	}else{
+		d = {value:msg}
+	}
+
+  if (msg.length > 0) {
     $.ajax({
       type: "POST",
       url: "http://localhost:8080/"+type,
-      data: {value:message}
+      data: d
     })
     .done(function(data) {
-      if (type === "message"){
+      if (!(type === "node")){
         document.getElementById("message").value = '';
       }
     });
   }
-  
   get_message_and_nodes()
-  
 }
 
 function appendPublic(){
@@ -31,7 +34,7 @@ function appendPublic(){
 }
 
 $(document).ready(function(){
-	appendPublic()	
+	appendPublic()
   $("button#appendPeer").click(function(e){
     var new_peer = prompt("Please enter new peer:", "IP_Address:Port");
 	if (!(new_peer == null || new_peer == "")) {
@@ -41,14 +44,22 @@ $(document).ready(function(){
 
   $("#message").keydown(function(e) {
     if (e.keyCode == 13) {
-		var txt = document.getElementById("message").value;
-		send("message",txt);
+			var txt = document.getElementById("message").value;
+			if(private_msg){
+				send("private",txt)
+			} else {
+				send("message",txt);
+			}
     }
   });
 
   $("button#send").click(function(e){
-	var txt = document.getElementById("message").value;
-	send("message",txt);
+		var txt = document.getElementById("message").value;
+		if(private_msg){
+			send("private",txt)
+		} else {
+			send("message",txt);
+		}
   });
 
 });
@@ -70,11 +81,13 @@ function privateDiscussion(event){
 	if(ID ==="public"){
 		private_msg = false;
 		private_id = ""
+		document.getElementById("message").placeholder = "Write message here..."
 	} else{
 		private_msg = true;
 		private_id = ID;
+		document.getElementById("message").placeholder = "Write private message here..."
 	}
-	
+
 }
 
 setInterval(get_message_and_nodes, 1000);
@@ -110,7 +123,7 @@ function get_message_and_nodes(){
 		  }
 
 		}
-	  });	
+	  });
 	} else {
 		$.ajax({
 			type: "GET",
@@ -128,9 +141,9 @@ function get_message_and_nodes(){
 					var msg = dataJSON[x.toString()];
 
 					var b = document.createElement("b");
-					b.appendChild(document.createTextNode(private_id + " : "))
+					b.appendChild(document.createTextNode(msg.Origin + " : "))
 
-					var text = document.createTextNode(msg);
+					var text = document.createTextNode(msg.Text);
 					p.appendChild(b);
 					p.appendChild(text);
 					document.querySelector("#msg-box").appendChild(p);
@@ -161,13 +174,13 @@ function get_message_and_nodes(){
       }
     }
   });
-  
+
   $.ajax({
     type: "GET",
     url: "http://localhost:8080/peer",
     success: function(data,status,xhr){
       document.querySelector("#discussions-box").innerHTML = "";
-	appendPublic()	
+	appendPublic()
       var dataJSON = JSON.parse(data);
       for(x in dataJSON){
 		var l = document.createElement("h5");
@@ -179,5 +192,3 @@ function get_message_and_nodes(){
     }
   });
 }
-
-
