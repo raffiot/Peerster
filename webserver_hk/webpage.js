@@ -34,7 +34,7 @@ function appendPublic(){
 }
 
 $(document).ready(function(){
-	appendPublic()
+	appendPublic();
   $("button#appendPeer").click(function(e){
     var new_peer = prompt("Please enter new peer:", "IP_Address:Port");
 	if (!(new_peer == null || new_peer == "")) {
@@ -82,6 +82,7 @@ function privateDiscussion(event){
 		private_msg = false;
 		private_id = ""
 		document.getElementById("message").placeholder = "Write message here..."
+
 	} else{
 		private_msg = true;
 		private_id = ID;
