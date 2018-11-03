@@ -49,6 +49,7 @@ func main() {
 	gossiperAddr := "127.0.0.1"
 	uiport := flag.String("UIPort", "8080", "port for the UI client (default \"8080\")")
 	dest := flag.String("dest", "", "destination for the private message")
+	//file := flag.String("file", "", "file to be indexed by the gossiper")
 	msg := flag.String("msg", "", "message to be send")
 	clientport := flag.String("ClientPort", "10010", "port for the client to communicate with gossiper (default \"10010\")")
 

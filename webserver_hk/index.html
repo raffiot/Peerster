@@ -19,20 +19,20 @@
 				<div class="line">
 					<label class="sub_title">Peers</label>
 					<button class="btn btn-default" id="appendPeer">Ajouter</Button>
-					
+
 					<div class="pane scrollable" id="peers-box">
 					</div>
 				</div>
-				
+
 				<div class="line horizontalLine">
 					<label class="sub_title">Dicussions</label>
 					<div class="pane scrollable" id="discussions-box">
 					</div>
 				</div>
 			</div>
-			
+
 			<div class="column right verticalLine">
-				
+
 				<div class="messagepane scrollable" id="msg-box">
 				</div>
 				<div class="input-group">
@@ -42,6 +42,10 @@
 						<span class="glyphicon glyphicon-circle-arrow-right" aria-hidden="true"></span>
 					</button>
 				</span>
+				<div>
+  				<label for="files" class="btn btn-default">Share files...</label>
+  				<input id="files" style="visibility:hidden;" type="file" onchange="previewFile();">
+					</div>
 				</div>
 			</div>
 		</div>

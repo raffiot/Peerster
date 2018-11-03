@@ -91,7 +91,7 @@ function privateDiscussion(event){
 
 }
 
-setInterval(get_message_and_nodes, 1000);
+//setInterval(get_message_and_nodes, 1000);
 
 function get_message_and_nodes(){
 	if(!private_msg){
@@ -192,4 +192,18 @@ function get_message_and_nodes(){
       }
     }
   });
+}
+
+function previewFile() {
+	//MAYBE WE DON'T WANT THIS
+  var file    = document.querySelector('input[type=file]').files[0];
+  var reader  = new FileReader();
+
+  reader.onloadend = function () {
+    console.log(reader.result);
+  }
+
+  if (file) {
+    reader.readAsDataURL(file);
+  }
 }
