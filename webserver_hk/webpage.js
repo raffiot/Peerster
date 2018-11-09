@@ -35,7 +35,7 @@ function appendPublic(){
 }
 
 $(document).ready(function(){
-	appendPublic()
+	appendPublic();
   $("button#appendPeer").click(function(e){
     var new_peer = prompt("Please enter new peer:", "IP_Address:Port");
 	if (!(new_peer == null || new_peer == "")) {
@@ -83,6 +83,7 @@ function privateDiscussion(event){
 		private_msg = false;
 		private_id = ""
 		document.getElementById("message").placeholder = "Write message here..."
+
 	} else{
 		private_msg = true;
 		private_id = ID;
@@ -91,7 +92,7 @@ function privateDiscussion(event){
 
 }
 
-setInterval(get_message_and_nodes, 1000);
+//setInterval(get_message_and_nodes, 1000);
 
 function get_message_and_nodes(){
 	if(!private_msg){
@@ -192,4 +193,18 @@ function get_message_and_nodes(){
       }
     }
   });
+}
+
+function previewFile() {
+	//MAYBE WE DON'T WANT THIS
+  var file    = document.querySelector('input[type=file]').files[0];
+  var reader  = new FileReader();
+
+  reader.onloadend = function () {
+    console.log(reader.result);
+  }
+
+  if (file) {
+    reader.readAsDataURL(file);
+  }
 }
