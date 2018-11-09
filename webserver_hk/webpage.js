@@ -30,6 +30,7 @@ function appendPublic(){
     l.innerHTML = "public";
 	l.onclick = privateDiscussion;
 	l.id = "public";
+	l.style.cursor =  "pointer";
     document.querySelector("#discussions-box").appendChild(l);
 }
 
@@ -166,7 +167,6 @@ function get_message_and_nodes(){
       var dataJSON = JSON.parse(data);
       for(x in dataJSON){
 		var p = document.createElement("h5");
-        var text = document.createTextNode("");
         var msg = dataJSON[x.toString()];
         var text = document.createTextNode(x.toString());
         p.appendChild(text);
@@ -187,6 +187,7 @@ function get_message_and_nodes(){
         l.innerHTML = dataJSON[x.toString()];
 		l.onclick = privateDiscussion;
 		l.id = dataJSON[x.toString()];
+		l.style.cursor =  "pointer";
         document.querySelector("#discussions-box").appendChild(l);
       }
     }

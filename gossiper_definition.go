@@ -14,6 +14,11 @@ type GossipPacket struct {
 	Private *PrivateMessage
 }
 
+type ClientPacket struct {
+	Simple  *SimpleMessage
+	Private *PrivateMessage
+	File 	*FileMessage
+}
 /**
 udp_address: Gossiper udp address
 conn: Gossiper-other gossiper udp connexion
@@ -41,6 +46,7 @@ type Gossiper struct {
 	clientConn       *net.UDPConn
 	clientAddr       *net.UDPAddr
 	rtimer           int
+	files			 []File
 }
 
 type SimpleMessage struct {
@@ -53,6 +59,12 @@ type RumorMessage struct {
 	Origin string
 	ID     uint32
 	Text   string
+}
+
+type FileMessage struct {
+	Destination string
+	Filename 	string
+	Request		string
 }
 
 type PrivateMessage struct {
@@ -84,6 +96,12 @@ type UDPPacket struct {
 	nb_byte int
 }
 
+type File struct{
+	Filename	string
+	Filesize 	int
+	Metafile	[]byte
+	Metahash 	[]byte
+}
 /**
 Convert a String in a *net.UDPAddr
 */

@@ -6,7 +6,11 @@ import (
 	"math/rand"
 	"net"
 	"time"
-
+	//"math"
+	"os"
+	"io"
+	"crypto/sha256"
+	"encoding/hex"
 	"github.com/dedis/protobuf"
 )
 
@@ -32,7 +36,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 	var s []PeerStatus
 	var a []PeerMessage
 	var pa = make(map[string][]PrivateMessage)
-
+	var file_tab []File
 	elementMap := make(map[string]bool)
 	for i := 0; i < len(peers); i++ {
 		elementMap[peers[i]] = true
@@ -52,6 +56,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		clientConn:       udpConnClient,
 		clientAddr:       udpAddrClient,
 		rtimer:           timer,
+		files:			  file_tab,
 	}
 }
 
@@ -65,13 +70,11 @@ func (g *Gossiper) receiveMessageFromClient() {
 	defer g.clientConn.Close()
 
 	for {
-		var pkt GossipPacket = GossipPacket{}
+		var pkt ClientPacket = ClientPacket{}
 		b := make([]byte, UDP_PACKET_SIZE)
 		nb_byte_written, _, err := g.clientConn.ReadFromUDP(b)
 		protobuf.Decode(b, &pkt)
 		if nb_byte_written > 0 && err == nil {
-			fmt.Println(pkt.Simple != nil)
-			fmt.Println(pkt.Private != nil)
 			if pkt.Simple != nil {
 				g.handleSimplePacket(pkt.Simple)
 			} else if pkt.Private != nil {
@@ -106,12 +109,93 @@ func (g *Gossiper) receiveMessageFromClient() {
 				} else {
 					fmt.Println("destination unknown for private message")
 				}
+			} else if pkt.File != nil {
+				if pkt.File.Request == "" {
+					g.loadFile(pkt.File.Filename)
+				} else {
+					//g.requestFile
+					//TO BE COMPLETE
+				}
+				
+			
 			} else {
-				fmt.Println(pkt.Private)
 				fmt.Println("Error client send packet with type different than simple message or private message.")
 			}
 		}
 	}
+}
+
+func (g *Gossiper) loadFile(filename string){
+
+	if filename == "" {
+		fmt.Println("error filename in empty")
+		return
+	}
+	var r io.Reader
+	r, err := os.Open("./_SharedFiles/"+filename)
+	if err != nil {
+		fmt.Printf("error opening file: %v\n",err)
+		os.Exit(1)
+	}
+	
+	
+	fi, e := os.Stat("./_SharedFiles/"+filename);
+	if e != nil {
+		fmt.Println(e)
+		return 
+	}
+	// get the size
+	filesize := int(fi.Size())
+	//Create containers
+	//sha_256 := sha256.New()
+	
+	//32*int(math.Ceil(float64(filesize)/float64(8)))
+	
+	var metafile []byte
+	//chunks := make([][]byte,0,int(ceil(fileSize/8)))
+
+	
+	
+	file_size_rem := filesize
+	//repeat read as long as there is data
+	for file_size_rem > 0 {
+		buf_size := 8192
+		if file_size_rem < 8192 {
+			buf_size = file_size_rem 
+		}
+		buf := make([]byte,buf_size)
+		
+		_,err := r.Read(buf)
+
+		if err != nil {
+			fmt.Println(err)
+			return 
+		}
+		//chunks = append(chunks,buf)
+
+		sha_256 := sha256.New()
+		sha_256.Write(buf)
+		metafile = append(metafile,sha_256.Sum(nil)...)
+		file_size_rem -= 8192
+		
+	}
+	sha_256 := sha256.New()
+	sha_256.Write(metafile)
+	metahash := sha_256.Sum(nil)
+	
+	
+	file := File{
+		Filename: filename,
+		Filesize: filesize,
+		Metafile: metafile,
+		Metahash: metahash,
+	}
+	fmt.Println(filename)
+	fmt.Println(filesize)
+	fmt.Println(hex.EncodeToString(metafile))
+	fmt.Println(hex.EncodeToString(metahash))
+	g.files = append(g.files,file)
+	return
 }
 
 /**

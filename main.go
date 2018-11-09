@@ -8,7 +8,7 @@ import (
 )
 
 var UDP_PACKET_SIZE = 2048
-var ANTI_ENTROPY_TIMER = 1 //Second
+var ANTI_ENTROPY_TIMER = 3 //Second
 var TIMEOUT_TIMER = 1      //Second
 var HOP_LIMIT = uint32(10)
 var me *Gossiper
@@ -33,7 +33,7 @@ func main() {
 	
 	me = NewGossiper(*gossipAddr, *name, peers_tab, *simple, client_ip+":"+*uiport, *rtimer)
 
-	if *rtimer > 0 {
+	if *rtimer > 0 && len(me.set_of_peers) > 0{
 		dst := me.chooseRandomPeer()
 		me.sendRouteRumor(dst)
 	}

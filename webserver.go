@@ -39,7 +39,7 @@ func MessageHandler(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 
-		pkt_to_enc := GossipPacket{Simple: &SimpleMessage{
+		pkt_to_enc := ClientPacket{Simple: &SimpleMessage{
 			OriginalName:  "client",
 			RelayPeerAddr: "",
 			Contents:      r.Form.Get("value"),
@@ -117,7 +117,7 @@ func PrivateMessageHandler(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 		fmt.Println(r.Form.Get("destination"))
-		pkt_to_enc := GossipPacket{Private: &PrivateMessage{
+		pkt_to_enc := ClientPacket{Private: &PrivateMessage{
 			Origin:      "",
 			ID:          0,
 			Text:        r.Form.Get("message"),
