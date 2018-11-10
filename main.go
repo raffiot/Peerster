@@ -34,7 +34,6 @@ func (g *Gossiper) gossiper_handler() {
 			fmt.Println("Error when receiving")
 			log.Fatal(err)
 		} else if nb_byte_written > 0 {
-			fmt.Println("Receiving new packet")
 			
 			bb := make([]byte,nb_byte_written)
 			copy(bb,b)

@@ -17,21 +17,24 @@ func (g *Gossiper) receiveMessageFromClient() {
 
 	defer g.clientConn.Close()
 	
-	b := make([]byte, 1000)
+	b := make([]byte, 10000)
 	for {
-		var pkt ClientPacket = ClientPacket{}
+		
 		nb_byte_written, _, err := g.clientConn.ReadFromUDP(b)
 		
 		if err != nil{
 			fmt.Println("Error when receiving")
 			log.Fatal(err)
 		} else if nb_byte_written > 0 {
-			//Decode
-			b = b[:nb_byte_written]
-			protobuf.Decode(b, &pkt)
+			bb := make([]byte,nb_byte_written)
+			copy(bb,b)
+
 			
 			
-			go func(){
+			
+			go func(bb []byte){
+				var pkt ClientPacket = ClientPacket{}
+				protobuf.Decode(bb, &pkt)
 				if pkt.Simple != nil {
 					g.handleSimplePacket(pkt.Simple)
 				} else if pkt.Private != nil {
@@ -46,7 +49,7 @@ func (g *Gossiper) receiveMessageFromClient() {
 				} else {
 					fmt.Println("Error malformed client packet")
 				}
-			}() // CHECK IF PARENTESIS WELL DONE
+			}(bb) // CHECK IF PARENTESIS WELL DONE
 		}
 	}
 }
