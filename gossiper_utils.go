@@ -52,6 +52,7 @@ type Gossiper struct {
 	clientAddr       *net.UDPAddr
 	rtimer           int
 	file_pending	 map[string][]File
+	rumor_acks		 map[string][]AckRumor
 }
 
 type SimpleMessage struct {
@@ -116,6 +117,12 @@ type DataReply struct {
 	Data []byte
 }
 
+type AckRumor struct {
+	Identifier 	string
+	NextID 		uint32
+	ch			chan bool
+} 
+
 /**
 Constructor of Gossiper
 */
@@ -139,6 +146,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 	var a []PeerMessage
 	var pa = make(map[string][]PrivateMessage)
 	var pending_file_tab = make(map[string][]File)
+	var ra = make(map[string][]AckRumor)
 	elementMap := make(map[string]bool)
 	for i := 0; i < len(peers); i++ {
 		elementMap[peers[i]] = true
@@ -159,6 +167,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		clientAddr:       udpAddrClient,
 		rtimer:           timer,
 		file_pending:	  pending_file_tab,
+		rumor_acks:		  ra,
 	}
 }
 
@@ -232,12 +241,12 @@ Print our neighbouring peers
 */
 func (g *Gossiper) listAllKnownPeers() {
 	fmt.Print("PEERS ")
-	mutex.Lock()
+	//mutex.Lock()
 	for k := range g.set_of_peers {
 		fmt.Print(k + ",")
 	}
 	fmt.Println("")
-	mutex.Unlock()
+	//mutex.Unlock()
 	return
 }
 

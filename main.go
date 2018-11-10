@@ -13,44 +13,59 @@ import (
 )
 
 var UDP_PACKET_SIZE = 2048
-var ANTI_ENTROPY_TIMER = 3 //Second
-var TIMEOUT_TIMER = 1      //Second
+var ANTI_ENTROPY_TIMER = 10 //Second
+var TIMEOUT_TIMER = 2      //Second
 var HOP_LIMIT = uint32(10)
 var me *Gossiper
 var mutex sync.Mutex
+
 
 func (g *Gossiper) gossiper_handler() {
 	b := make([]byte, 10000)
 	defer g.conn.Close()
 	for {
-		var pkt GossipPacket = GossipPacket{}
+		
+		
+		
 		nb_byte_written, sender, err := g.conn.ReadFromUDP(b)
-
+		
+		
 		if err != nil {
 			fmt.Println("Error when receiving")
 			log.Fatal(err)
 		} else if nb_byte_written > 0 {
-
-			go func() {
+			fmt.Println("Receiving new packet")
+			
+			bb := make([]byte,nb_byte_written)
+			copy(bb,b)
+			
+			go func(bb []byte) {
+				
 				//Decode
-				bytes_packet := b[:nb_byte_written]
-				protobuf.Decode(bytes_packet, &pkt)
+				//bytes_packet := bb[:nb_byte_written]
+				var pkt GossipPacket = GossipPacket{}
+				protobuf.Decode(bb, &pkt)
 
 				//Append sender to set of peers if unknown
 				sender_formatted := ParseIPStr(sender)
-				mutex.Lock()
+				
 				_, ok := g.set_of_peers[sender_formatted]
 				if !ok && sender_formatted != ParseIPStr(g.udp_address) {
+					mutex.Lock()
 					g.set_of_peers[sender_formatted] = true
+					mutex.Unlock()
 				}
-				mutex.Unlock()
+				
 
 				//Process packet
 				if pkt.Simple != nil {
+
 					g.handleSimplePacketG(pkt.Simple, sender)
 				} else if pkt.Status != nil {
+
 					g.StatusPacketRoutine(pkt.Status, sender)
 				} else if pkt.Rumor != nil {
+
 					if (sender_formatted != ParseIPStr(g.udp_address)) && (pkt.Rumor.Text != "") {
 						printRumorMessageRcv(pkt.Rumor, sender)
 						g.listAllKnownPeers()
@@ -73,7 +88,7 @@ func (g *Gossiper) gossiper_handler() {
 				} else {
 					fmt.Println("Error malformed gossip packet")
 				}
-			}()
+			}(bb)
 		}
 	}
 }
@@ -88,7 +103,8 @@ func (g *Gossiper) rtimer_handler() {
 	//After a rtimer send route rumor to a random peer
 	tickerRouting := time.NewTicker(time.Duration(g.rtimer) * time.Second)
 	for _ = range tickerRouting.C {
-		if len(g.set_of_peers) > 0 {
+		
+		if len(g.set_of_peers) > 0{
 			dst := g.chooseRandomPeer()
 			g.sendRouteRumor(dst)
 		}
@@ -101,10 +117,12 @@ func (g *Gossiper) anti_entropy_handler() {
 	tickerAEntropy := time.NewTicker(time.Duration(ANTI_ENTROPY_TIMER) * time.Second)
 	for _ = range tickerAEntropy.C {
 		//!receivedInTime &&
+
 		if len(g.set_of_peers) > 0 {
 			dst := g.chooseRandomPeer()
 			g.sendMyStatus(dst, 0)
 		}
+
 	}
 }
 
@@ -124,6 +142,7 @@ func main() {
 		peers_tab = strings.Split(*peers, ",")
 	}
 
+	
 	me = NewGossiper(*gossipAddr, *name, peers_tab, *simple, client_ip+":"+*uiport, *rtimer)
 
 	if *rtimer > 0 {

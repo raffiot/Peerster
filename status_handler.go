@@ -16,9 +16,24 @@ if sender missed packet we send the Rumor message missed
 func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 	printStatusMessageRcv(pkt, sender)
 	g.listAllKnownPeers()
+
+	//mutex.Lock()
+	if g.rumor_acks[ParseIPStr(sender)] != nil {
+
+		for _,v1 := range pkt.Want{
+			for i,v2 := range g.rumor_acks[ParseIPStr(sender)]{
+				if v1.Identifier == v2.Identifier && v1.NextID == v2.NextID {
+					g.rumor_acks[ParseIPStr(sender)][i].ch<-true
+
+				}
+			}
+		}
+	}
+	//mutex.Unlock()
+	
 	vco := pkt.Want
 	var vcm []PeerStatus
-	mutex.Lock()
+	//mutex.Lock()
 	for i := 0; i < len(g.vector_clock); i++ {
 		p := PeerStatus{
 			Identifier: g.vector_clock[i].Identifier,
@@ -26,7 +41,7 @@ func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 		}
 		vcm = append(vcm, p)
 	}
-	mutex.Unlock()
+	//mutex.Unlock()
 	//vcm := g.vector_clock
 
 	numberToAsk := 0
@@ -71,6 +86,17 @@ func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 		g.sendMyStatus(sender, numberToAsk)
 	} else {
 		fmt.Println("IN SYNC WITH " + ParseIPStr(sender))
+		//mutex.Lock()
+		if g.rumor_acks[ParseIPStr(sender)] != nil {
+			for _,v1 := range pkt.Want{
+				for i,v2 := range g.rumor_acks[ParseIPStr(sender)]{
+					if v1.Identifier == v2.Identifier && v1.NextID == v2.NextID {
+						g.rumor_acks[ParseIPStr(sender)][i].ch<-true
+					}
+				}
+			}
+		}
+		//mutex.Unlock()
 	}
 	return
 }
@@ -80,14 +106,14 @@ Send our status and wait for numberToAsk messages to arrive so we are up to date
 */
 func (g *Gossiper) sendMyStatus(sender *net.UDPAddr, numberToAsk int) {
 	var w []PeerStatus
-	mutex.Lock()
+	
 	for i := 0; i < len(g.vector_clock); i++ {
 		w = append(w, PeerStatus{
 			Identifier: g.vector_clock[i].Identifier,
 			NextID:     g.vector_clock[i].NextID,
 		})
 	}
-	mutex.Unlock()
+	
 	newPkt := GossipPacket{Status: &StatusPacket{
 		Want: w,
 	}}
@@ -97,6 +123,7 @@ func (g *Gossiper) sendMyStatus(sender *net.UDPAddr, numberToAsk int) {
 		fmt.Println("Encode of the packet failed")
 		log.Fatal(err)
 	}
+
 
 	mutex.Lock()
 	g.conn.WriteToUDP(pktByte, sender)
@@ -127,7 +154,7 @@ We send the rumor messages from a specific origin the sender doesn't have yet
 */
 func (g *Gossiper) sendUpdate(pDefault PeerStatus, sender *net.UDPAddr) {
 
-	mutex.Lock()
+	
 	my_message := g.archives
 	for i := 0; i < len(my_message); i++ {
 		if my_message[i].Identifier == pDefault.Identifier {
@@ -147,7 +174,9 @@ func (g *Gossiper) sendUpdate(pDefault PeerStatus, sender *net.UDPAddr) {
 						fmt.Println("Encode of the packet failed")
 						log.Fatal(err)
 					}
+					mutex.Lock()
 					g.conn.WriteToUDP(pktByte, sender)
+					mutex.Unlock()
 					j++
 				} else {
 					finished = true
@@ -155,6 +184,6 @@ func (g *Gossiper) sendUpdate(pDefault PeerStatus, sender *net.UDPAddr) {
 			}
 		}
 	}
-	mutex.Unlock()
+	
 	return
 }

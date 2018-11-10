@@ -103,10 +103,12 @@ func (g *Gossiper) receive_file_request_for_me(pkt *DataRequest){
 	// We send a nil data if we don't have file.
 
 	file_id := hex.EncodeToString(pkt.HashValue)
+
 	var buf []byte
-	if fi, err := os.Stat("/._Chunks/"+file_id); !os.IsNotExist(err) {
-		buf := make([]byte,int(fi.Size()))
-		r, err := os.Open("/._Chunks/"+file_id)
+	if fi, err := os.Stat("./._Chunks/"+file_id); !os.IsNotExist(err) {
+
+		buf = make([]byte,int(fi.Size()))
+		r, err := os.Open("./._Chunks/"+file_id)
 		if err != nil {
 			fmt.Printf("error opening file: %v\n",err)
 			os.Exit(1)
@@ -117,9 +119,11 @@ func (g *Gossiper) receive_file_request_for_me(pkt *DataRequest){
 			fmt.Println(err)
 			return 
 		}
+	
 		
 	}
-
+	
+	
 	newPkt := GossipPacket{DataReply: &DataReply{
 		Origin: g.Name,
 		Destination: pkt.Origin,
@@ -129,7 +133,7 @@ func (g *Gossiper) receive_file_request_for_me(pkt *DataRequest){
 	}}
 	
 	mutex.Lock()	
-	next_hop, ok := g.DSDV[pkt.Destination]
+	next_hop, ok := g.DSDV[pkt.Origin]
 	if ok {
 		pktByte, err := protobuf.Encode(&newPkt)
 		if err != nil{
@@ -137,7 +141,7 @@ func (g *Gossiper) receive_file_request_for_me(pkt *DataRequest){
 			log.Fatal(err)
 		}
 		g.conn.WriteToUDP(pktByte, ParseStrIP(next_hop))
-		fmt.Println("data request sent")
+		fmt.Println("data reply sent")
 	} else {
 		fmt.Println("destination unknown for data message")
 	}
@@ -197,11 +201,14 @@ func (g *Gossiper) forward_data_msg(pkt *GossipPacket){
 
 
 func (g *Gossiper) requestFile(pkt *FileMessage){
+	
+	tmp,_ := hex.DecodeString(pkt.Request)
+	
 	newPkt := GossipPacket{DataRequest: &DataRequest{
 		Origin: g.Name,
 		Destination: pkt.Destination,
 		HopLimit: HOP_LIMIT,
-		HashValue: []byte(pkt.Request), //Check if correct with copy and everything
+		HashValue: tmp, //Check if correct with copy and everything
 	}}
 	
 	pktByte, err := protobuf.Encode(&newPkt)
@@ -224,7 +231,7 @@ func (g *Gossiper) requestFile(pkt *FileMessage){
 		Filename: 	pkt.Filename,
 		Filesize:	0,
 		Metafile:	nil,
-		Metahash:	[]byte(pkt.Request),
+		Metahash:	tmp,
 	}
 	if ok {
 		g.file_pending[pkt.Destination] = append(g.file_pending[pkt.Destination], f)
@@ -236,26 +243,55 @@ func (g *Gossiper) requestFile(pkt *FileMessage){
 }
 
 func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply){
+
 	if pkt.Data != nil {
-		
+		var newPkt GossipPacket
 		mutex.Lock()
 		pending_array := make([]File, len(g.file_pending[pkt.Origin]))
 		copy(pending_array,g.file_pending[pkt.Origin]) 
 		mutex.Unlock()
 		index := -1
-		for i,v := range pending_array {
-			if bytes.Equal(pkt.HashValue, v.Metahash){
+		found := false
+		for i,_ := range pending_array {
+
+			if bytes.Equal(pkt.HashValue, pending_array[i].Metahash){
+	
 				//We received first packet for a file
 				arr := make([]byte,len(pkt.Data))
 				copy(arr,pkt.Data)
-				v.Metafile = arr
-				downloadPrint(v.Filename,-2, pkt.Origin)
-				break
-			} else if v.Metafile != nil {
-				pkt_waited := v.Filesize / 8192
-				//If the packet we receive is confirmed to be the next because the hash is the good one
-				if bytes.Equal(pkt.HashValue, v.Metafile[pkt_waited:pkt_waited+32]){
+				pending_array[i].Metafile = arr
+				downloadPrint(pending_array[i].Filename,-2, pkt.Origin)
 				
+				newPkt = GossipPacket{DataRequest: &DataRequest{
+					Origin: g.Name,
+					Destination: pkt.Origin,
+					HopLimit: HOP_LIMIT,
+					HashValue: pending_array[i].Metafile[0:32],
+				}}
+				
+				f, err := os.OpenFile("./._Chunks/"+hex.EncodeToString(pkt.HashValue), os.O_CREATE|os.O_WRONLY, 0644)
+				if err != nil {
+					fmt.Println("Error when loading the file")
+					log.Fatal(err)
+					return
+				}
+				if _, err := f.Write(pkt.Data); err != nil {
+					log.Fatal(err)
+				}
+				if err := f.Close(); err != nil {
+					log.Fatal(err)
+				}
+				
+				found = true
+				break
+			} else if pending_array[i].Metafile != nil {
+		
+				pkt_waited := pending_array[i].Filesize / 8192
+
+				//If the packet we receive is confirmed to be the next because the hash is the good one
+				if bytes.Equal(pkt.HashValue, pending_array[i].Metafile[pkt_waited:pkt_waited+32]){
+
+					found = true
 					err := ioutil.WriteFile("./._Chunks/"+hex.EncodeToString(pkt.HashValue), pkt.Data, 0644)
 					if err != nil {
 						fmt.Println("Error during write of hash")
@@ -263,7 +299,7 @@ func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply){
 						return
 					}
 					
-					f, err := os.OpenFile("./_SharedFiles/"+v.Filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+					f, err := os.OpenFile("./_SharedFiles/"+pending_array[i].Filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 					if _, err := f.Write(pkt.Data); err != nil {
 						log.Fatal(err)
 					}
@@ -271,38 +307,24 @@ func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply){
 						log.Fatal(err)
 					}
 					
-					if pkt_waited+32 >= len(v.Metafile){
+					if pkt_waited+32 >= len(pending_array[i].Metafile){
 						//It was the last packet we waited for this file
-						downloadPrint(v.Filename,-1, "")
+						downloadPrint(pending_array[i].Filename,-1, "")
 						index = i
 					} else{
-						downloadPrint(v.Filename,pkt_waited, pkt.Origin)
-						v.Filesize += 8192
-						pkt_wanted := v.Filesize / 8192
-						newPkt := GossipPacket{DataRequest: &DataRequest{
+						downloadPrint(pending_array[i].Filename,pkt_waited, pkt.Origin)
+						pending_array[i].Filesize += 8192
+						pkt_wanted := pending_array[i].Filesize / 8192
+						newPkt = GossipPacket{DataRequest: &DataRequest{
 							Origin: g.Name,
 							Destination: pkt.Origin,
 							HopLimit: HOP_LIMIT,
-							HashValue: v.Metafile[pkt_wanted:pkt_wanted+32],
+							HashValue: pending_array[i].Metafile[pkt_wanted:pkt_wanted+32],
 						}}
-						
-						pktByte, err := protobuf.Encode(&newPkt)
-						if err != nil {
-							fmt.Println("Encode of the packet failed")
-							log.Fatal(err)
-						}
-						mutex.Lock()
-						next_hop, ok := g.DSDV[pkt.Destination]
-						if ok {
-							g.conn.WriteToUDP(pktByte, ParseStrIP(next_hop))
-							fmt.Println("data request sent")
-						} else {
-							fmt.Println("destination unknown for data request message")
-						}
-						mutex.Unlock()
-					}			
+					}
+					break					
 				}
-				break
+				
 			}	
 		}
 		if index != -1 {
@@ -312,6 +334,21 @@ func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply){
 			//this should modify the reference so its okay
 			//g.file_pending[pkt.Origin] = append(g.file_pending[:index],g.file_pending[index+1:]...)
 			
+		} else if found {
+			pktByte, err := protobuf.Encode(&newPkt)
+			if err != nil {
+				fmt.Println("Encode of the packet failed")
+				log.Fatal(err)
+			}
+			mutex.Lock()
+			next_hop, ok := g.DSDV[pkt.Origin]
+			if ok {
+				g.conn.WriteToUDP(pktByte, ParseStrIP(next_hop))
+				fmt.Println("data request sent")
+			} else {
+				fmt.Println("destination unknown for data request message")
+			}
+			mutex.Unlock()
 		}
 		mutex.Lock()
 		g.file_pending[pkt.Origin] = pending_array

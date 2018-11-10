@@ -5,6 +5,7 @@ import (
 	"log"
 	"math/rand"
 	"net"
+	"time"
 	"github.com/dedis/protobuf"
 )
 
@@ -53,12 +54,15 @@ func (g *Gossiper) sendingRoutine(pkt *RumorMessage, dst *net.UDPAddr) {
 	g.conn.WriteToUDP(pktByte, dst)
 	mutex.Unlock()
 	
+	go g.ackRumorHandler(pkt,dst)
+
+	/**
 	rnd := rand.Int() % 2
 	if rnd == 0 && len(g.set_of_peers) > 0 {
 		newDst := g.chooseRandomPeer()
 		flippedCoin(newDst)
 		g.sendingRoutine(pkt, newDst)
-	}
+	}*/
 	
 	//TO BE COMPLETE !!!!
 	
@@ -103,7 +107,7 @@ func (g *Gossiper) sendRouteRumor(dst *net.UDPAddr) {
 	newID := uint32(1)
 	var index int
 	isFirstMessage := true
-	mutex.Lock()
+	
 	for i := 0; i < len(me.archives); i++ {
 		if me.archives[i].Identifier == g.Name {
 			newID = uint32(len(me.archives[i].msgs) + 1)
@@ -119,6 +123,7 @@ func (g *Gossiper) sendRouteRumor(dst *net.UDPAddr) {
 			ID:     newID,
 			Text:   "",
 		}
+		mutex.Lock()
 		g.vector_clock = append(g.vector_clock, PeerStatus{
 			Identifier: g.Name,
 			NextID:     uint32(2),
@@ -128,15 +133,18 @@ func (g *Gossiper) sendRouteRumor(dst *net.UDPAddr) {
 			Identifier: g.Name,
 			msgs:       a,
 		})
+		mutex.Unlock()
 	} else {
+		mutex.Lock()
 		me.archives[index].msgs[newID] = &RumorMessage{
 			Origin: g.Name,
 			ID:     newID,
 			Text:   "",
 		}
 		me.vector_clock[index].NextID += 1
+		mutex.Unlock()
 	}
-	mutex.Unlock()
+	
 
 	pktNew := GossipPacket{Rumor: &RumorMessage{
 		Origin: g.Name,
@@ -167,17 +175,19 @@ func (g *Gossiper) updateArchivesVC(pkt *RumorMessage, sender *net.UDPAddr) (boo
 	var containSender bool = false
 	var alreadyHave bool = false
 	var notAdded bool = false
-	mutex.Lock()
+	
 	for i := 0; i < len(g.vector_clock); i++ {
 		var ps PeerStatus = g.vector_clock[i]
 		if ps.Identifier == pkt.Origin {
 			if ps.NextID == pkt.ID {
+				mutex.Lock()
 				g.archives[i].msgs[ps.NextID] = &RumorMessage{
 					Origin: pkt.Origin,
 					ID:     pkt.ID,
 					Text:   pkt.Text,
 				}
 				g.vector_clock[i].NextID = ps.NextID + 1
+				mutex.Unlock()
 			} else if ps.NextID > pkt.ID {
 				alreadyHave = true
 			} else {
@@ -201,6 +211,7 @@ func (g *Gossiper) updateArchivesVC(pkt *RumorMessage, sender *net.UDPAddr) (boo
 			nID = 1
 			notAdded = true
 		}
+		mutex.Lock()
 		g.vector_clock = append(g.vector_clock, PeerStatus{
 			Identifier: pkt.Origin,
 			NextID:     nID,
@@ -210,13 +221,81 @@ func (g *Gossiper) updateArchivesVC(pkt *RumorMessage, sender *net.UDPAddr) (boo
 			Identifier: pkt.Origin,
 			msgs:       a,
 		})
+		mutex.Unlock()
 	}
 	
 	if !alreadyHave && ParseIPStr(sender) != ParseIPStr(g.udp_address) {
+		mutex.Lock()
 		g.DSDV[pkt.Origin] = ParseIPStr(sender)
+		mutex.Unlock()
 		fmt.Println("DSDV " + pkt.Origin + " " + ParseIPStr(sender))
 	}
 
-	mutex.Unlock()
+	
 	return alreadyHave, notAdded
 }
+
+func (g *Gossiper) ackRumorHandler(pkt *RumorMessage, sender *net.UDPAddr) {
+	
+	chann := make(chan bool)
+	
+	ar := AckRumor{
+		Identifier:	pkt.Origin,
+		NextID:		pkt.ID +1,
+		ch:			chann,
+	}
+	
+	mutex.Lock()
+	g.rumor_acks[ParseIPStr(sender)] = append(g.rumor_acks[ParseIPStr(sender)],ar)
+	mutex.Unlock()
+	select {
+	case _ = <-chann:
+		_ = <-chann
+
+		//IF to time channel send bool it means that we are in sync
+		
+		index := -1
+		for i,v := range g.rumor_acks[ParseIPStr(sender)] {
+			if v.Identifier == pkt.Origin && v.NextID == pkt.ID+1 {
+				index = i
+			}
+		}
+		if index < 0 {
+			fmt.Println("Error, ack entry not found")
+			return
+		}
+		mutex.Lock()
+		g.rumor_acks[ParseIPStr(sender)] = append(g.rumor_acks[ParseIPStr(sender)][:index],g.rumor_acks[ParseIPStr(sender)][index+1:]...)
+		mutex.Unlock()
+		
+		rnd := rand.Int() % 2
+		if rnd == 0 && len(g.set_of_peers) > 0 {
+			newDst := g.chooseRandomPeer()
+			flippedCoin(newDst)
+			g.sendingRoutine(pkt, newDst)
+		}
+	case <-time.After(time.Duration(TIMEOUT_TIMER) * time.Second):
+		
+		index := -1
+		for i,v := range g.rumor_acks[ParseIPStr(sender)] {
+			if v.Identifier == pkt.Origin && v.NextID == pkt.ID+1 {
+				index = i
+			}
+		}
+		if index < 0 {
+			fmt.Println("Error, ack entry not found")
+			return
+		}
+		//Is it possible that delete fail if just one message?
+		mutex.Lock()
+		g.rumor_acks[ParseIPStr(sender)] = append(g.rumor_acks[ParseIPStr(sender)][:index],g.rumor_acks[ParseIPStr(sender)][index+1:]...)
+		mutex.Unlock()
+		rnd := rand.Int() % 2
+		if rnd == 0 && len(g.set_of_peers) > 0 {
+			newDst := g.chooseRandomPeer()
+			flippedCoin(newDst)
+			g.sendingRoutine(pkt, newDst)
+		}
+	}
+
+} 
