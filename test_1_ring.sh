@@ -7,7 +7,7 @@ cd ..
 
 RED='\033[0;31m'
 NC='\033[0m'
-DEBUG="true"
+DEBUG="false"
 
 outputFiles=()
 message=Weather_is_clear
@@ -78,12 +78,15 @@ do
 	fi
 	gossipPort=$(($gossipPort+1))
 	if !(grep -q "$msgLine" "${outputFiles[$i]}") ; then
+			echo "${outputFiles[$i]} didn't receive $msgLine"
    		failed="T"
 	fi
 	if !(grep -q "$peersLine" "${outputFiles[$i]}") ; then
+				echo "${outputFiles[$i]} didn't receive $peersLine"
         failed="T"
     fi
 	if !(grep -q "$msgLine2" "${outputFiles[$i]}") ; then
+				echo "${outputFiles[$i]} didn't receive $msgLine2"
         failed="T"
     fi
 done
