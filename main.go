@@ -5,6 +5,10 @@ import (
 	"net/http"
 	"strings"
 	"sync"
+	"fmt"
+	"log"
+	"github.com/dedis/protobuf"
+	"time"
 )
 
 var UDP_PACKET_SIZE = 2048
@@ -13,6 +17,97 @@ var TIMEOUT_TIMER = 1      //Second
 var HOP_LIMIT = uint32(10)
 var me *Gossiper
 var mutex sync.Mutex
+
+func (g *Gossiper) gossiper_handler(){
+	b := make([]byte, 100000)
+	defer g.conn.Close()	
+	for {
+		var pkt GossipPacket = GossipPacket{}
+		nb_byte_written, sender, err := g.conn.ReadFromUDP(b)
+		
+		if err != nil{
+			fmt.Println("Error when receiving")
+			log.Fatal(err)
+		} else if nb_byte_written > 0 {
+			
+			go func(){
+				//Decode
+				b = b[:nb_byte_written]
+				protobuf.Decode(b, &pkt)
+				
+				
+				//Append sender to set of peers if unknown
+				sender_formatted := ParseIPStr(sender)
+				mutex.Lock()
+				_, ok := g.set_of_peers[sender_formatted]
+				if !ok && sender_formatted != ParseIPStr(g.udp_address) {
+					g.set_of_peers[sender_formatted] = true
+				}
+				mutex.Unlock()
+				
+								
+				//Process packet
+				if pkt.Simple != nil {
+					g.handleSimplePacketG(pkt.Simple, sender)
+				} else if pkt.Status != nil {
+					g.StatusPacketRoutine(pkt.Status, sender)
+				} else if pkt.Rumor != nil {
+					if (sender_formatted != ParseIPStr(g.udp_address)) && (pkt.Rumor.Text != "") {
+						printRumorMessageRcv(pkt.Rumor, sender)
+						g.listAllKnownPeers()
+					}
+					g.rumorMessageRoutine(pkt.Rumor, sender)
+				} else if pkt.Private != nil {
+					g.privateMessageRoutine(pkt.Private)
+				} else if pkt.DataRequest != nil {
+					if pkt.DataRequest.Destination == g.Name {
+						// TO BE COMPLETE
+					} else {
+						g.forward_data_msg(&pkt)
+					}
+				} else if pkt.DataReply != nil {
+					if pkt.DataReply.Destination == g.Name {
+						// TO BE COMPLETE
+					} else {
+						g.forward_data_msg(&pkt)
+					}
+				}  else {
+					fmt.Println("Error malformed gossip packet")
+				}
+			}()
+		}		
+	}
+}
+
+func (g *Gossiper) rtimer_handler(){
+	//first advisoring
+	if len(g.set_of_peers) > 0{
+		dst := me.chooseRandomPeer()
+		me.sendRouteRumor(dst)
+	}
+	
+	//After a rtimer send route rumor to a random peer
+	tickerRouting := time.NewTicker(time.Duration(g.rtimer) * time.Second)
+	for _ = range tickerRouting.C {
+		if len(g.set_of_peers) > 0 {
+			dst := g.chooseRandomPeer()
+			g.sendRouteRumor(dst)
+		}
+	}
+}
+
+func (g *Gossiper) anti_entropy_handler(){
+
+	//After ANTI_ENTROPY_TIMER send a status to a peer
+	tickerAEntropy := time.NewTicker(time.Duration(ANTI_ENTROPY_TIMER) * time.Second)
+	for _ = range tickerAEntropy.C {
+		//!receivedInTime && 
+		if len(g.set_of_peers) > 0 {
+			dst := g.chooseRandomPeer()
+			g.sendMyStatus(dst, 0)
+		}
+	}
+}
 
 func main() {
 	client_ip := "127.0.0.1"
@@ -32,15 +127,17 @@ func main() {
 	
 	
 	me = NewGossiper(*gossipAddr, *name, peers_tab, *simple, client_ip+":"+*uiport, *rtimer)
-
-	if *rtimer > 0 && len(me.set_of_peers) > 0{
-		dst := me.chooseRandomPeer()
-		me.sendRouteRumor(dst)
+	
+	if *rtimer > 0 {
+		go me.rtimer_handler()
 	}
+	
+	go me.anti_entropy_handler()
+	
 
 	go me.receiveMessageFromClient()
 	if *server {
-		go me.receiveMessageFromGossiper()
+		go me.gossiper_handler()
 		http.HandleFunc("/message", MessageHandler)
 		http.HandleFunc("/node", NodeHandler)
 		http.HandleFunc("/id", IdHandler)
@@ -51,7 +148,7 @@ func main() {
 			panic(err)
 		}
 	} else {
-		me.receiveMessageFromGossiper()
+		me.gossiper_handler()
 	}
 
 }

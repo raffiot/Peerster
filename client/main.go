@@ -9,13 +9,6 @@ import (
 	"github.com/dedis/protobuf"
 )
 
-type GossipPacket struct {
-	Simple  *SimpleMessage
-	Rumor   *RumorMessage
-	Status  *StatusPacket
-	Private *PrivateMessage
-}
-
 type ClientPacket struct {
 	Simple  *SimpleMessage
 	Private *PrivateMessage
