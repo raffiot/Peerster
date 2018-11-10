@@ -132,7 +132,7 @@ func (g *Gossiper) receive_file_request_for_me(pkt *DataRequest){
 		Data: buf,
 	}}
 	
-	mutex.Lock()	
+	
 	next_hop, ok := g.DSDV[pkt.Origin]
 	if ok {
 		pktByte, err := protobuf.Encode(&newPkt)
@@ -140,26 +140,28 @@ func (g *Gossiper) receive_file_request_for_me(pkt *DataRequest){
 			fmt.Println("Error encoding packet")
 			log.Fatal(err)
 		}
+		mutex.Lock()	
 		g.conn.WriteToUDP(pktByte, ParseStrIP(next_hop))
+		mutex.Unlock()	
 		fmt.Println("data reply sent")
 	} else {
 		fmt.Println("destination unknown for data message")
 	}
-	mutex.Unlock()	
+	
 }
 
 func (g *Gossiper) forward_data_msg(pkt *GossipPacket){
 	if pkt.DataRequest != nil ||  pkt.DataReply != nil{
 		var next_hop string
 		var ok bool
-		mutex.Lock()
+
 		if pkt.DataRequest != nil{
 			next_hop, ok = g.DSDV[pkt.DataRequest.Destination]
 		} else{
 			next_hop, ok = g.DSDV[pkt.DataReply.Destination]
 		}
 		
-		mutex.Unlock()
+
 		if ok {
 			var newPkt GossipPacket
 			var hop uint32
@@ -216,15 +218,17 @@ func (g *Gossiper) requestFile(pkt *FileMessage){
 		fmt.Println("Encode of the packet failed")
 		log.Fatal(err)
 	}
-	mutex.Lock()
+	
 	next_hop, ok := g.DSDV[pkt.Destination]
 	if ok {
+		mutex.Lock()
 		g.conn.WriteToUDP(pktByte, ParseStrIP(next_hop))
+		mutex.Unlock()
 		fmt.Println("data request sent")
 	} else {
 		fmt.Println("destination unknown for data request message")
 	}
-	mutex.Unlock()
+	
 	
 	_,ok = g.file_pending[pkt.Destination]
 	f := File{
@@ -234,11 +238,15 @@ func (g *Gossiper) requestFile(pkt *FileMessage){
 		Metahash:	tmp,
 	}
 	if ok {
+		mutex.Lock()
 		g.file_pending[pkt.Destination] = append(g.file_pending[pkt.Destination], f)
+		mutex.Unlock()
 	} else {
 		var new_array []File
 		new_array = append(new_array,f)
+		mutex.Lock()
 		g.file_pending[pkt.Destination] = new_array
+		mutex.Unlock()
 	}
 }
 
@@ -246,10 +254,12 @@ func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply){
 
 	if pkt.Data != nil {
 		var newPkt GossipPacket
+
 		mutex.Lock()
 		pending_array := make([]File, len(g.file_pending[pkt.Origin]))
 		copy(pending_array,g.file_pending[pkt.Origin]) 
 		mutex.Unlock()
+
 		index := -1
 		found := false
 		for i,_ := range pending_array {
@@ -329,8 +339,9 @@ func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply){
 		}
 		if index != -1 {
 			// File download has been completed
-			
+			mutex.Lock()
 			pending_array = append(pending_array[:index],pending_array[index+1:]...)
+			mutex.Unlock()
 			//this should modify the reference so its okay
 			//g.file_pending[pkt.Origin] = append(g.file_pending[:index],g.file_pending[index+1:]...)
 			
@@ -340,15 +351,17 @@ func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply){
 				fmt.Println("Encode of the packet failed")
 				log.Fatal(err)
 			}
-			mutex.Lock()
+			m
 			next_hop, ok := g.DSDV[pkt.Origin]
 			if ok {
+				mutex.Lock()
 				g.conn.WriteToUDP(pktByte, ParseStrIP(next_hop))
+				mutex.Unlock()
 				fmt.Println("data request sent")
 			} else {
 				fmt.Println("destination unknown for data request message")
 			}
-			mutex.Unlock()
+			
 		}
 		mutex.Lock()
 		g.file_pending[pkt.Origin] = pending_array

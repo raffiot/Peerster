@@ -177,7 +177,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 This function return the UDPAddr of a peer chose randomly
 */
 func (g *Gossiper) chooseRandomPeer() *net.UDPAddr {
-	mutex.Lock()
+
 	r := rand.Intn(len(g.set_of_peers))
 	i := 0
 	var addr *net.UDPAddr
@@ -187,7 +187,7 @@ func (g *Gossiper) chooseRandomPeer() *net.UDPAddr {
 		}
 		i++
 	}
-	mutex.Unlock()
+
 	return addr
 }
 
@@ -266,11 +266,11 @@ func printPrivateMessageRcv(pkt *PrivateMessage) {
 
 func (g *Gossiper) printDSDV() {
 	fmt.Println("DSDV :")
-	mutex.Lock()
+
 	for k, v := range g.DSDV {
 		fmt.Println(k + " : " + v)
 	}
-	mutex.Unlock()
+
 }
 
 func downloadPrint(filename string, chunk_nb int, origin string){

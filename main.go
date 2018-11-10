@@ -13,8 +13,8 @@ import (
 )
 
 var UDP_PACKET_SIZE = 2048
-var ANTI_ENTROPY_TIMER = 10 //Second
-var TIMEOUT_TIMER = 2      //Second
+var ANTI_ENTROPY_TIMER = 1 //Second
+var TIMEOUT_TIMER = 1      //Second
 var HOP_LIMIT = uint32(10)
 var me *Gossiper
 var mutex sync.Mutex

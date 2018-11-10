@@ -25,7 +25,7 @@ func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 		for _,v1 := range pkt.Want{
 			for i,v2 := range cop{
 				if v1.Identifier == v2.Identifier && v1.NextID == v2.NextID {
-					g.rumor_acks[ParseIPStr(sender)][i].ch<-true
+					cop[i].ch<-true
 
 				}
 			}
@@ -93,7 +93,7 @@ func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 			for _,v1 := range pkt.Want{
 				for i,v2 := range cop{
 					if v1.Identifier == v2.Identifier && v1.NextID == v2.NextID {
-						g.rumor_acks[ParseIPStr(sender)][i].ch<-true
+						cop[i].ch<-true
 					}
 				}
 			}

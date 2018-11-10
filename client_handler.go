@@ -77,7 +77,7 @@ func (g *Gossiper) handleSimplePacket(pkt *SimpleMessage) {
 			log.Fatal(err)
 		}
 		g.listAllKnownPeers()
-		mutex.Lock()
+
 		for k := range g.set_of_peers {
 			dst, err := net.ResolveUDPAddr("udp4", k)
 			if err != nil {
@@ -86,16 +86,16 @@ func (g *Gossiper) handleSimplePacket(pkt *SimpleMessage) {
 			}
 			g.conn.WriteToUDP(pktByte, dst)
 		}
-		mutex.Unlock()
+
 	} else {
 		var my_ID uint32 = 1
-		mutex.Lock()
+
 		for i := 0; i < len(g.vector_clock); i++ {
 			if g.vector_clock[i].Identifier == g.Name {
 				my_ID = g.vector_clock[i].NextID
 			}
 		}
-		mutex.Unlock()
+
 		newPkt := GossipPacket{Rumor: &RumorMessage{
 			Origin: g.Name,
 			ID:     my_ID,
@@ -114,7 +114,7 @@ func (g *Gossiper) handleSimplePacket(pkt *SimpleMessage) {
 }
 
 func (g *Gossiper) private_packet_handler_client(pkt *PrivateMessage) {
-	mutex.Lock()
+
 	newPkt := GossipPacket{Private: &PrivateMessage{
 		Origin:      g.Name,
 		ID:          0,
@@ -124,15 +124,16 @@ func (g *Gossiper) private_packet_handler_client(pkt *PrivateMessage) {
 		}}
 	fmt.Println(pkt.Destination)
 	next_hop, ok := g.DSDV[pkt.Destination]
-	mutex.Unlock()
+
 	if ok {
 		_, ok := g.archives_private[pkt.Destination]
 		if !ok {
 			var new_array []PrivateMessage
 				g.archives_private[pkt.Destination] = new_array
 			}
+			mutex.Lock()
 			g.archives_private[pkt.Destination] = append(g.archives_private[pkt.Destination], *newPkt.Private)
-				
+			mutex.Unlock()	
 			pktByte, err := protobuf.Encode(&newPkt)
 			if err != nil {
 				fmt.Println("Encode of the packet failed")

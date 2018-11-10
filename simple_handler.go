@@ -31,7 +31,7 @@ func (g *Gossiper) handleSimplePacketG(pkt *SimpleMessage, sender *net.UDPAddr) 
 		log.Fatal(err)
 	}
 	g.listAllKnownPeers()
-	mutex.Lock()
+	
 	for k := range g.set_of_peers {
 		if k != sender_formatted {
 			dst, err := net.ResolveUDPAddr("udp4", k)
@@ -39,8 +39,10 @@ func (g *Gossiper) handleSimplePacketG(pkt *SimpleMessage, sender *net.UDPAddr) 
 				fmt.Println("cannot resolve addr of other gossiper")
 				log.Fatal(err)
 			}
+			mutex.Lock()
 			g.conn.WriteToUDP(packet_encoded, dst)
+			mutex.Unlock()
 		}
 	}
-	mutex.Unlock()
+	
 }
