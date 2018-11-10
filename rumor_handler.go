@@ -275,7 +275,7 @@ func (g *Gossiper) ackRumorHandler(pkt *RumorMessage, sender *net.UDPAddr) {
 			g.sendingRoutine(pkt, newDst)
 		}
 	case <-time.After(time.Duration(TIMEOUT_TIMER) * time.Second):
-		
+		fmt.Println("timeout!")
 		index := -1
 		for i,v := range g.rumor_acks[ParseIPStr(sender)] {
 			if v.Identifier == pkt.Origin && v.NextID == pkt.ID+1 {
