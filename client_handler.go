@@ -40,7 +40,7 @@ func (g *Gossiper) receiveMessageFromClient() {
 					if pkt.File.Request == "" {
 						g.loadFile(pkt.File.Filename)
 					} else {
-						//g.requestFile
+						g.requestFile(pkt.File)
 						//TO BE COMPLETE
 					}
 				} else {

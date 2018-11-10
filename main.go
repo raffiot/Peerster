@@ -60,13 +60,13 @@ func (g *Gossiper) gossiper_handler() {
 					g.privateMessageRoutine(pkt.Private)
 				} else if pkt.DataRequest != nil {
 					if pkt.DataRequest.Destination == g.Name {
-						// TO BE COMPLETE
+						g.receive_file_request_for_me(pkt.DataRequest)
 					} else {
 						g.forward_data_msg(&pkt)
 					}
 				} else if pkt.DataReply != nil {
 					if pkt.DataReply.Destination == g.Name {
-						// TO BE COMPLETE
+						g.receive_file_reply_for_me(pkt.DataReply)
 					} else {
 						g.forward_data_msg(&pkt)
 					}

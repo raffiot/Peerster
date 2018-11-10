@@ -51,7 +51,7 @@ type Gossiper struct {
 	clientConn       *net.UDPConn
 	clientAddr       *net.UDPAddr
 	rtimer           int
-	files			 map[string]File
+	file_pending	 map[string][]File
 }
 
 type SimpleMessage struct {
@@ -92,13 +92,6 @@ type StatusPacket struct {
 type PeerMessage struct {
 	Identifier string
 	msgs       map[uint32]*RumorMessage
-}
-
-type UDPPacket struct {
-	bytes   []byte
-	err     error
-	sender  *net.UDPAddr
-	nb_byte int
 }
 
 type File struct{
@@ -145,7 +138,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 	var s []PeerStatus
 	var a []PeerMessage
 	var pa = make(map[string][]PrivateMessage)
-	var file_tab = make(map[string]File)
+	var pending_file_tab = make(map[string][]File)
 	elementMap := make(map[string]bool)
 	for i := 0; i < len(peers); i++ {
 		elementMap[peers[i]] = true
@@ -165,7 +158,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		clientConn:       udpConnClient,
 		clientAddr:       udpAddrClient,
 		rtimer:           timer,
-		files:			  file_tab,
+		file_pending:	  pending_file_tab,
 	}
 }
 
@@ -271,7 +264,16 @@ func (g *Gossiper) printDSDV() {
 	mutex.Unlock()
 }
 
-
+func downloadPrint(filename string, chunk_nb int, origin string){
+	if chunk_nb >= 0 {
+		str := fmt.Sprint(chunk_nb)
+		fmt.Println("DOWNLOADING "+filename+ " chunk "+str+ " from " + origin)
+	} else if chunk_nb == -1 {
+		fmt.Println("RECONSTRUCTED file "+filename)
+	} else if chunk_nb == -2 {
+		fmt.Println("DOWNLOADING metafile of "+ filename+" from "+origin)
+	}
+}
 
 
 
