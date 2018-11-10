@@ -19,14 +19,16 @@ func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 
 	//mutex.Lock()
 	if g.rumor_acks[ParseIPStr(sender)] != nil {
-
+		
 		for _,v1 := range pkt.Want{
+			mutex.Lock()
 			for i,v2 := range g.rumor_acks[ParseIPStr(sender)]{
 				if v1.Identifier == v2.Identifier && v1.NextID == v2.NextID {
 					g.rumor_acks[ParseIPStr(sender)][i].ch<-true
 
 				}
 			}
+			mutex.Unlock()
 		}
 	}
 	//mutex.Unlock()
@@ -89,11 +91,13 @@ func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 		//mutex.Lock()
 		if g.rumor_acks[ParseIPStr(sender)] != nil {
 			for _,v1 := range pkt.Want{
+				mutex.Lock()
 				for i,v2 := range g.rumor_acks[ParseIPStr(sender)]{
 					if v1.Identifier == v2.Identifier && v1.NextID == v2.NextID {
 						g.rumor_acks[ParseIPStr(sender)][i].ch<-true
 					}
 				}
+				mutex.Unlock()
 			}
 		}
 		//mutex.Unlock()
