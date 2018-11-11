@@ -13,8 +13,9 @@ import (
 )
 
 var UDP_PACKET_SIZE = 2048
-var ANTI_ENTROPY_TIMER = 1 //Second
+var ANTI_ENTROPY_TIMER = 10 //Second
 var TIMEOUT_TIMER = 1      //Second
+var TIMEOUT_FILE = 5	//Second
 var HOP_LIMIT = uint32(10)
 var me *Gossiper
 var mutex sync.Mutex
@@ -158,6 +159,7 @@ func main() {
 		http.HandleFunc("/id", IdHandler)
 		http.HandleFunc("/peer", PeerHandler)
 		http.HandleFunc("/private", PrivateMessageHandler)
+		http.HandleFunc("/file", FileMessageHandler)
 
 		if err := http.ListenAndServe("localhost:8080", nil); err != nil {
 			panic(err)

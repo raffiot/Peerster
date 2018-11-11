@@ -252,19 +252,22 @@ func (g *Gossiper) ackRumorHandler(pkt *RumorMessage, sender *net.UDPAddr) {
 	case _ = <-chann:
 		_ = <-chann
 
-		//IF to time channel send bool it means that we are in sync
+		//IF two time channel send bool it means that we are in sync
 		
 		index := -1
+		mutex.Lock()
 		for i,v := range g.rumor_acks[ParseIPStr(sender)] {
 			if v.Identifier == pkt.Origin && v.NextID == pkt.ID+1 {
 				index = i
 			}
 		}
+		
 		if index < 0 {
 			fmt.Println("Error, ack entry not found")
+			mutex.Unlock()
 			return
 		}
-		mutex.Lock()
+		
 		g.rumor_acks[ParseIPStr(sender)] = append(g.rumor_acks[ParseIPStr(sender)][:index],g.rumor_acks[ParseIPStr(sender)][index+1:]...)
 		mutex.Unlock()
 		

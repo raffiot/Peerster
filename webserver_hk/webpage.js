@@ -17,7 +17,7 @@ function send(type, msg) {
       data: d
     })
     .done(function(data) {
-      if (!(type === "node")){
+      if (!(type === "node") ){
         document.getElementById("message").value = '';
       }
     });
@@ -25,14 +25,71 @@ function send(type, msg) {
   get_message_and_nodes()
 }
 
+
+
 function appendPublic(){
-	var l = document.createElement("h5");
-    l.innerHTML = "public";
-	l.onclick = privateDiscussion;
-	l.id = "public";
-	l.style.cursor =  "pointer";
-    document.querySelector("#discussions-box").appendChild(l);
+	var div = document.createElement("div");
+	div.setAttribute('class','peer_group');
+	
+	var b = document.createElement("b");
+	b.id = "b_public";
+	b.onclick = privateDiscussion;
+	b.style.cursor =  "pointer";
+	b.appendChild(document.createTextNode("public"));
+	div.appendChild(b)
+
+	
+
+	var button = document.createElement("button");
+	button.setAttribute('class','btn btn-default');
+	button.type = "submit";
+	button.id = "upload_public";
+	button.onclick=fileup
+	//button.style.float = "right";
+	var span = document.createElement("span");
+	span.setAttribute('class', 'glyphicon glyphicon-upload');
+	span.setAttribute('aria-hidden','true');
+	button.appendChild(span);
+
+	div.appendChild(button);
+	
+	document.querySelector("#discussions-box").appendChild(div);
+
 }
+
+function appendPeer(s){
+	
+	var div = document.createElement("div");
+	div.setAttribute('class','peer_group');
+	
+	var b = document.createElement("b");
+	b.id = "b_"+s;
+	b.onclick = privateDiscussion;
+	b.style.cursor =  "pointer";
+	b.appendChild(document.createTextNode(s));
+	div.appendChild(b)
+
+	
+
+	var button = document.createElement("button");
+	button.setAttribute('class','btn btn-default');
+	button.type = "submit";
+	button.id = s;
+	button.onclick=fileRequest;
+	//button.style.float = "right";
+	var span = document.createElement("span");
+	span.setAttribute('class', 'glyphicon glyphicon-file');
+	span.setAttribute('aria-hidden','true');
+	button.appendChild(span);
+
+	div.appendChild(button);
+	
+	document.querySelector("#discussions-box").appendChild(div);
+
+}
+
+
+
 
 $(document).ready(function(){
 	appendPublic();
@@ -57,12 +114,11 @@ $(document).ready(function(){
   $("button#send").click(function(e){
 		var txt = document.getElementById("message").value;
 		if(private_msg){
-			send("private",txt)
+			send("private",txt);
 		} else {
 			send("message",txt);
 		}
   });
-
 });
 
 $.ajax({
@@ -76,6 +132,7 @@ $.ajax({
 });
 
 function privateDiscussion(event){
+	console.log("in privateDiscussion")
 	var ID = event.target.id;
 	console.log(ID)
 	document.getElementById("msg-box").innerHTML = '';
@@ -89,10 +146,43 @@ function privateDiscussion(event){
 		private_id = ID;
 		document.getElementById("message").placeholder = "Write private message here..."
 	}
-
+	get_message_and_nodes()
 }
 
-//setInterval(get_message_and_nodes, 1000);
+
+function fileRequest(event){
+	var ID = event.target.id;
+	var req = prompt("Please enter the Name and Methash of the file you want from "+ID+":", "Filename:Metahash");
+	if (!(req == null || req == "")) {
+		var res = req.split(":")
+		var file = res[0]
+		var metahash = res[1]
+		if ((file != "") && (metahash != "")){
+			$.ajax({
+			  type: "POST",
+			  url: "http://localhost:8080/file",
+			  data: {type:"request",filename:file,destination:ID,request:metahash}
+			});
+		}
+	}
+	
+}
+
+
+function fileup(){
+
+	var req = prompt("Please enter the name of the file you want to share:", "filename");
+	if (!(req == null || req == "")) {
+		$.ajax({
+		  type: "POST",
+		  url: "http://localhost:8080/file",
+		  data: {type:"upload",filename:req}
+		});
+	}
+	
+}
+
+setInterval(get_message_and_nodes, 1000);
 
 function get_message_and_nodes(){
 	if(!private_msg){
@@ -180,17 +270,17 @@ function get_message_and_nodes(){
     type: "GET",
     url: "http://localhost:8080/peer",
     success: function(data,status,xhr){
-      document.querySelector("#discussions-box").innerHTML = "";
-	appendPublic()
+      //document.querySelector("#discussions-box").innerHTML = "";
+		//appendPublic()
       var dataJSON = JSON.parse(data);
-      for(x in dataJSON){
-		var l = document.createElement("h5");
-        l.innerHTML = dataJSON[x.toString()];
-		l.onclick = privateDiscussion;
-		l.id = dataJSON[x.toString()];
-		l.style.cursor =  "pointer";
-        document.querySelector("#discussions-box").appendChild(l);
-      }
+	  len = Object.keys(dataJSON).length;
+	  if ( len * 2 +1 > document.querySelector("#discussions-box").childNodes.length){
+		  for(x in dataJSON){
+			if (x == len-1){
+				appendPeer(dataJSON[x.toString()]);
+			}
+		}
+	  }
     }
   });
 }

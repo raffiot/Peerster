@@ -38,13 +38,12 @@ func (g *Gossiper) receiveMessageFromClient() {
 				if pkt.Simple != nil {
 					g.handleSimplePacket(pkt.Simple)
 				} else if pkt.Private != nil {
-				
+					g.private_packet_handler_client(pkt.Private)
 				} else if pkt.File != nil {
 					if pkt.File.Request == "" {
 						g.loadFile(pkt.File.Filename)
 					} else {
 						g.requestFile(pkt.File)
-						//TO BE COMPLETE
 					}
 				} else {
 					fmt.Println("Error malformed client packet")
@@ -84,7 +83,9 @@ func (g *Gossiper) handleSimplePacket(pkt *SimpleMessage) {
 				fmt.Println("cannot resolve addr of ather gossiper")
 				log.Fatal(err)
 			}
+			mutex.Lock()
 			g.conn.WriteToUDP(pktByte, dst)
+			mutex.Unlock()
 		}
 
 	} else {

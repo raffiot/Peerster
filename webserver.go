@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
+	"log"
 	"github.com/dedis/protobuf"
 )
 
@@ -12,7 +12,7 @@ func MessageHandler(w http.ResponseWriter, r *http.Request) {
 	enableCors(&w)
 	if r.Method == "GET" {
 		var values []RumorMessage
-		mutex.Lock()
+		
 		for i := 0; i < len(me.archives); i++ {
 			finished := false
 			j := 1
@@ -28,7 +28,7 @@ func MessageHandler(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		}
-		mutex.Unlock()
+		
 		jsonValue, _ := json.Marshal(values)
 		w.WriteHeader(http.StatusOK)
 		w.Write(jsonValue)
@@ -45,7 +45,9 @@ func MessageHandler(w http.ResponseWriter, r *http.Request) {
 			Contents:      r.Form.Get("value"),
 		}}
 		packetBytes, err := protobuf.Encode(&pkt_to_enc)
+		mutex.Lock()
 		me.clientConn.WriteToUDP(packetBytes, me.clientAddr)
+		mutex.Unlock()
 	}
 
 }
@@ -53,9 +55,7 @@ func MessageHandler(w http.ResponseWriter, r *http.Request) {
 func NodeHandler(w http.ResponseWriter, r *http.Request) {
 	enableCors(&w)
 	if r.Method == "GET" {
-		mutex.Lock()
 		values := me.set_of_peers
-		mutex.Unlock()
 		jsonValue, _ := json.Marshal(values)
 		w.WriteHeader(http.StatusOK)
 		w.Write(jsonValue)
@@ -102,12 +102,12 @@ func PrivateMessageHandler(w http.ResponseWriter, r *http.Request) {
 			peer = k
 		}
 
-		mutex.Lock()
+		
 		keys := make([]PrivateMessage, 0, len(me.archives_private[peer]))
 		for _, k := range me.archives_private[peer] {
 			keys = append(keys, k)
 		}
-		mutex.Unlock()
+		
 		jsonValue, _ := json.Marshal(keys)
 		w.Write(jsonValue)
 	} else if r.Method == "POST" {
@@ -126,10 +126,49 @@ func PrivateMessageHandler(w http.ResponseWriter, r *http.Request) {
 		}}
 
 		packetBytes, err := protobuf.Encode(&pkt_to_enc)
+		fmt.Println("sending Private")
 		mutex.Lock()
 		me.clientConn.WriteToUDP(packetBytes, me.clientAddr)
 		mutex.Unlock()
 	}
+}
+
+func FileMessageHandler(w http.ResponseWriter, r *http.Request) {
+	enableCors(&w)
+	w.WriteHeader(http.StatusOK)
+	err := r.ParseForm()
+	if err != nil {
+		panic(err)
+	}
+	fmt.Println(r.Form.Get("type"))
+	var pkt_to_enc ClientPacket
+	type_post := r.Form.Get("type")
+	if type_post == "upload" {
+		pkt_to_enc = ClientPacket{File: &FileMessage{
+			Destination: 	"",
+			Filename:		r.Form.Get("filename"),
+			Request:		"",
+		}}	
+	} else if type_post == "request" {
+		pkt_to_enc = ClientPacket{File: &FileMessage{
+			Destination: 	r.Form.Get("destination"),
+			Filename:		r.Form.Get("filename"),
+			Request:		r.Form.Get("request"),
+		}}
+		
+	} else{
+		fmt.Println("Unknown file request type")
+		return
+	}
+	packetBytes, err := protobuf.Encode(&pkt_to_enc)
+
+	if err != nil {
+		fmt.Println("Encoding of message went wrong !")
+		log.Fatal(err)
+	}
+	mutex.Lock()
+	me.clientConn.WriteToUDP(packetBytes, me.clientAddr)
+	mutex.Unlock()
 }
 
 func enableCors(w *http.ResponseWriter) {

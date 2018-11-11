@@ -53,6 +53,7 @@ type Gossiper struct {
 	rtimer           int
 	file_pending	 map[string][]File
 	rumor_acks		 map[string][]AckRumor
+	file_acks		 map[string][]AckFile
 }
 
 type SimpleMessage struct {
@@ -123,6 +124,11 @@ type AckRumor struct {
 	ch			chan bool
 } 
 
+type AckFile struct{
+	HashExpected string
+	ch			 chan bool
+}
+
 /**
 Constructor of Gossiper
 */
@@ -147,6 +153,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 	var pa = make(map[string][]PrivateMessage)
 	var pending_file_tab = make(map[string][]File)
 	var ra = make(map[string][]AckRumor)
+	var fa = make(map[string][]AckFile)
 	elementMap := make(map[string]bool)
 	for i := 0; i < len(peers); i++ {
 		elementMap[peers[i]] = true
@@ -168,6 +175,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		rtimer:           timer,
 		file_pending:	  pending_file_tab,
 		rumor_acks:		  ra,
+		file_acks:		  fa,
 	}
 }
 
