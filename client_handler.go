@@ -11,7 +11,6 @@ import (
 /**
 Routine that handle the messages that we receive from the client
 at <127.0.0.1:ClientPort>
-We handle only the GossipPacket of type SimpleMessage
 */
 func (g *Gossiper) receiveMessageFromClient() {
 
