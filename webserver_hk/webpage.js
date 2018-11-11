@@ -32,9 +32,10 @@ function appendPublic(){
 	div.setAttribute('class','peer_group');
 	
 	var b = document.createElement("b");
-	b.id = "b_public";
+	b.id = "public";
 	b.onclick = privateDiscussion;
 	b.style.cursor =  "pointer";
+	b.style.margin =  "auto";
 	b.appendChild(document.createTextNode("public"));
 	div.appendChild(b)
 
@@ -45,7 +46,7 @@ function appendPublic(){
 	button.type = "submit";
 	button.id = "upload_public";
 	button.onclick=fileup
-	//button.style.float = "right";
+	button.style.float = "right";
 	var span = document.createElement("span");
 	span.setAttribute('class', 'glyphicon glyphicon-upload');
 	span.setAttribute('aria-hidden','true');
@@ -61,11 +62,12 @@ function appendPeer(s){
 	
 	var div = document.createElement("div");
 	div.setAttribute('class','peer_group');
-	
+	div.id = "private_peer"
 	var b = document.createElement("b");
-	b.id = "b_"+s;
+	b.id = s;
 	b.onclick = privateDiscussion;
 	b.style.cursor =  "pointer";
+	b.style.margin =  "auto";
 	b.appendChild(document.createTextNode(s));
 	div.appendChild(b)
 
@@ -76,7 +78,7 @@ function appendPeer(s){
 	button.type = "submit";
 	button.id = s;
 	button.onclick=fileRequest;
-	//button.style.float = "right";
+	button.style.float = "right";
 	var span = document.createElement("span");
 	span.setAttribute('class', 'glyphicon glyphicon-file');
 	span.setAttribute('aria-hidden','true');
@@ -132,21 +134,28 @@ $.ajax({
 });
 
 function privateDiscussion(event){
-	console.log("in privateDiscussion")
+	//console.log("in privateDiscussion")
 	var ID = event.target.id;
-	console.log(ID)
+	//console.log(ID)
 	document.getElementById("msg-box").innerHTML = '';
 	if(ID ==="public"){
 		private_msg = false;
-		private_id = ""
-		document.getElementById("message").placeholder = "Write message here..."
-
+		private_id = "";
+		document.getElementById("message").placeholder = "Write message here...";
+		
 	} else{
+		
 		private_msg = true;
 		private_id = ID;
-		document.getElementById("message").placeholder = "Write private message here..."
+		document.getElementById("message").placeholder = "Write private message to "+ID+" here...";
 	}
-	get_message_and_nodes()
+	
+	var childDivs = document.getElementById("discussions-box").getElementsByTagName('div');
+	for( i=0; i< childDivs.length; i++ ){
+		childDivs[i].style.background = "#ffffff";
+	}
+	event.target.parentElement.style.background = "#85c1e9";
+	get_message_and_nodes();
 }
 
 
@@ -270,8 +279,24 @@ function get_message_and_nodes(){
     type: "GET",
     url: "http://localhost:8080/peer",
     success: function(data,status,xhr){
-      //document.querySelector("#discussions-box").innerHTML = "";
-		//appendPublic()
+		var dataJSON = JSON.parse(data)
+		//console.log(dataJSON)
+		var la = d3.selectAll("#discussions-box")
+		la.selectAll("#private_peer")
+			.data(dataJSON)
+			.enter()
+			.each(d => appendPeer(d.toString()));
+			//.append("b")
+			//.text(d => d.toString());
+
+		/**
+    document.querySelector("#discussions-box").innerHTML = "";
+	appendPublic()
+	var dataJSON = JSON.parse(data)
+	for(x in dataJSON){
+		appendPeer(dataJSON[x.toString()]);
+	}*/
+	/**	
       var dataJSON = JSON.parse(data);
 	  len = Object.keys(dataJSON).length;
 	  if ( len * 2 +1 > document.querySelector("#discussions-box").childNodes.length){
@@ -280,7 +305,8 @@ function get_message_and_nodes(){
 				appendPeer(dataJSON[x.toString()]);
 			}
 		}
-	  }
+	  }*/
+	  
     }
   });
 }

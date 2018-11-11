@@ -63,3 +63,17 @@ p {
 	background: #ffffff;
 	box-shadow: 0px 1px 4px rgba(0, 0, 0, .2);
 }
+
+.peer_group {
+	margin: 5px 10px !important;
+	padding: 5px 5px;
+	display: flex;
+	background: #ffffff;
+	box-shadow: 0px 1px 4px rgba(0, 0, 0, .2);
+}
+
+#discussion_label{
+    display: block;
+    text-align: left;
+	margin: 15px;
+}
