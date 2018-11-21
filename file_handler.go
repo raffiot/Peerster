@@ -224,8 +224,8 @@ func (g *Gossiper) requestFile(pkt *FileMessage){
 		mutex.Unlock()
 	}
 	
-	if _, err := os.Stat("./_SharedFiles/"+pkt.Filename); !os.IsNotExist(err) {
-		err = os.Remove("./_SharedFiles/"+pkt.Filename)
+	if _, err := os.Stat("./_Downloads/"+pkt.Filename); !os.IsNotExist(err) {
+		err = os.Remove("./_Downloads/"+pkt.Filename)
 		if err != nil {
 			fmt.Println("couldn't remove file")
 			return
@@ -312,7 +312,7 @@ func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply){
 						return
 					}
 					
-					f, err := os.OpenFile("./_SharedFiles/"+pending_array[i].Filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+					f, err := os.OpenFile("./_Downloads/"+pending_array[i].Filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 					if _, err := f.Write(pkt.Data); err != nil {
 						log.Fatal(err)
 					}

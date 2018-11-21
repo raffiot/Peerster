@@ -43,7 +43,7 @@ Send private message "how are you?" to nodeA
 go run main.go -UIPort=10000 -file="text.txt" -ClientPort=10011  
 Upload text.txt file that was disponible in ./_SharedFile/text.txt to make it available to other gossipers
 
-go run main.go -UIPort=10000 -dest=nodeA -file="text2.txt" -req="715b1934521a0215b180986cdd931782a8381c58c18a9e6e7f4bfd149afd4a61" -ClientPort=10011
+go run main.go -UIPort=10000 -dest=nodeA -file="text2.txt" -request="715b1934521a0215b180986cdd931782a8381c58c18a9e6e7f4bfd149afd4a61" -ClientPort=10011
 Download file identified by "715b1934521a0215b180986cdd931782a8381c58c18a9e6e7f4bfd149afd4a61" from nodeA and write it locally as ./_SharedFile/text2.txt 
 
 
