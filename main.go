@@ -14,33 +14,29 @@ import (
 
 var UDP_PACKET_SIZE = 2048
 var ANTI_ENTROPY_TIMER = 2 //Second
-var TIMEOUT_TIMER = 1      //Second
-var TIMEOUT_FILE = 5	//Second
+var TIMEOUT_TIMER = 2      //Second
+var TIMEOUT_FILE = 5       //Second
 var HOP_LIMIT = uint32(10)
 var me *Gossiper
 var mutex sync.Mutex
-
 
 func (g *Gossiper) gossiper_handler() {
 	b := make([]byte, 10000)
 	defer g.conn.Close()
 	for {
-		
-		
-		
+
 		nb_byte_written, sender, err := g.conn.ReadFromUDP(b)
-		
-		
+
 		if err != nil {
 			fmt.Println("Error when receiving")
 			log.Fatal(err)
 		} else if nb_byte_written > 0 {
-			
-			bb := make([]byte,nb_byte_written)
-			copy(bb,b)
-			
+
+			bb := make([]byte, nb_byte_written)
+			copy(bb, b)
+
 			go func(bb []byte) {
-				
+
 				//Decode
 				//bytes_packet := bb[:nb_byte_written]
 				var pkt GossipPacket = GossipPacket{}
@@ -48,14 +44,13 @@ func (g *Gossiper) gossiper_handler() {
 
 				//Append sender to set of peers if unknown
 				sender_formatted := ParseIPStr(sender)
-				
+
 				_, ok := g.set_of_peers[sender_formatted]
 				if !ok && sender_formatted != ParseIPStr(g.udp_address) {
 					mutex.Lock()
 					g.set_of_peers[sender_formatted] = true
 					mutex.Unlock()
 				}
-				
 
 				//Process packet
 				if pkt.Simple != nil {
@@ -103,8 +98,8 @@ func (g *Gossiper) rtimer_handler() {
 	//After a rtimer send route rumor to a random peer
 	tickerRouting := time.NewTicker(time.Duration(g.rtimer) * time.Second)
 	for _ = range tickerRouting.C {
-		
-		if len(g.set_of_peers) > 0{
+
+		if len(g.set_of_peers) > 0 {
 			dst := g.chooseRandomPeer()
 			g.sendRouteRumor(dst)
 		}
@@ -142,7 +137,6 @@ func main() {
 		peers_tab = strings.Split(*peers, ",")
 	}
 
-	
 	me = NewGossiper(*gossipAddr, *name, peers_tab, *simple, client_ip+":"+*uiport, *rtimer)
 
 	if *rtimer > 0 {

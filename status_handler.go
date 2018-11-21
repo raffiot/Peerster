@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"net"
+
 	"github.com/dedis/protobuf"
 )
 
@@ -17,22 +18,22 @@ func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 	printStatusMessageRcv(pkt, sender)
 	g.listAllKnownPeers()
 
-	cop := make([]AckRumor,len(g.rumor_acks[ParseIPStr(sender)]))
+	cop := make([]AckRumor, len(g.rumor_acks[ParseIPStr(sender)]))
 	copy(cop, g.rumor_acks[ParseIPStr(sender)])
 	//mutex.Lock()
 	if g.rumor_acks[ParseIPStr(sender)] != nil {
-		
-		for _,v1 := range pkt.Want{
-			for i,v2 := range cop{
+
+		for _, v1 := range pkt.Want {
+			for i, v2 := range cop {
 				if v1.Identifier == v2.Identifier && v1.NextID == v2.NextID {
-					cop[i].ch<-true
+					cop[i].ch <- true
 
 				}
 			}
 		}
 	}
 	//mutex.Unlock()
-	
+
 	vco := pkt.Want
 	var vcm []PeerStatus
 	//mutex.Lock()
@@ -90,10 +91,10 @@ func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 		fmt.Println("IN SYNC WITH " + ParseIPStr(sender))
 		//mutex.Lock()
 		if g.rumor_acks[ParseIPStr(sender)] != nil {
-			for _,v1 := range pkt.Want{
-				for i,v2 := range cop{
+			for _, v1 := range pkt.Want {
+				for i, v2 := range cop {
 					if v1.Identifier == v2.Identifier && v1.NextID == v2.NextID {
-						cop[i].ch<-true
+						cop[i].ch <- true
 					}
 				}
 			}
@@ -108,14 +109,14 @@ Send our status and wait for numberToAsk messages to arrive so we are up to date
 */
 func (g *Gossiper) sendMyStatus(sender *net.UDPAddr, numberToAsk int) {
 	var w []PeerStatus
-	
+
 	for i := 0; i < len(g.vector_clock); i++ {
 		w = append(w, PeerStatus{
 			Identifier: g.vector_clock[i].Identifier,
 			NextID:     g.vector_clock[i].NextID,
 		})
 	}
-	
+
 	newPkt := GossipPacket{Status: &StatusPacket{
 		Want: w,
 	}}
@@ -126,14 +127,13 @@ func (g *Gossiper) sendMyStatus(sender *net.UDPAddr, numberToAsk int) {
 		log.Fatal(err)
 	}
 
-
 	mutex.Lock()
 	g.conn.WriteToUDP(pktByte, sender)
 	mutex.Unlock()
-	
+
 	/**
-	
-	
+
+
 	for i := 0; i < numberToAsk; i++ {
 		pkt := GossipPacket{}
 		b := make([]byte, UDP_PACKET_SIZE)
@@ -156,7 +156,6 @@ We send the rumor messages from a specific origin the sender doesn't have yet
 */
 func (g *Gossiper) sendUpdate(pDefault PeerStatus, sender *net.UDPAddr) {
 
-	
 	my_message := g.archives
 	for i := 0; i < len(my_message); i++ {
 		if my_message[i].Identifier == pDefault.Identifier {
@@ -186,6 +185,6 @@ func (g *Gossiper) sendUpdate(pDefault PeerStatus, sender *net.UDPAddr) {
 			}
 		}
 	}
-	
+
 	return
 }
