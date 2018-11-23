@@ -39,11 +39,14 @@ func (g *Gossiper) receiveMessageFromClient() {
 				} else if pkt.Private != nil {
 					g.private_packet_handler_client(pkt.Private)
 				} else if pkt.File != nil {
+					//TO BE COMPLETE case with no dest !!
 					if pkt.File.Request == "" {
 						g.loadFile(pkt.File.Filename)
 					} else {
 						g.requestFile(pkt.File)
 					}
+				} else if pkt.Search != nil {
+					g.search_packet_handler(pkt.Search) //launch as subroutine?
 				} else {
 					fmt.Println("Error malformed client packet")
 				}
@@ -146,4 +149,26 @@ func (g *Gossiper) private_packet_handler_client(pkt *PrivateMessage) {
 		} else {
 			fmt.Println("destination unknown for private message")
 		}	
+}
+
+func (g *Gossiper) search_packet_handler(pkt *SearchRequest){
+
+	var sm []SearchMatch
+	var ch chan bool
+	mutex.Lock()
+	g.pending_search.Is_pending = true
+	g.pending_search.Nb_match = 0
+	if pkt.Budget == 0 {
+		ch = make(chan bool)
+	}
+	g.pending_search.ch = ch
+	g.search_matches = sm //Clear old search_matches
+	mutex.Unlock()
+	if pkt.Budget == 0 {
+		go g.search_routine(pkt)
+	} else {
+		// May be we want to send to all peers with same budget?	
+		g.propagate_search(pkt)
+	
+	}
 }

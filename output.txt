@@ -1,6 +1,0 @@
-A running at UIPort 12345 and gossipPort 5000 and peer 127.0.0.1:5001
-B running at UIPort 12346 and gossipPort 5001 and peer 127.0.0.1:5002
-C running at UIPort 12347 and gossipPort 5002 and peer 127.0.0.1:5003
-D running at UIPort 12348 and gossipPort 5003 and peer 127.0.0.1:5004
-E running at UIPort 12349 and gossipPort 5004 and peer 127.0.0.1:5005
-F running at UIPort 12350 and gossipPort 5005 and peer 127.0.0.1:5006

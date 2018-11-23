@@ -16,12 +16,15 @@ type GossipPacket struct {
 	Private *PrivateMessage
 	DataRequest *DataRequest
     DataReply   *DataReply
+	SearchRequest *SearchRequest
+	SearchReply	*SearchReply
 }
 
 type ClientPacket struct {
 	Simple  *SimpleMessage
 	Private *PrivateMessage
 	File 	*FileMessage
+	Search	*SearchRequest
 }
 
 /**
@@ -54,6 +57,9 @@ type Gossiper struct {
 	file_pending	 map[string][]File
 	rumor_acks		 map[string][]AckRumor
 	file_acks		 map[string][]AckFile
+	search_req_timeout map[string]bool
+	search_matches	 []SearchMatch
+	pending_search	 PendingSearch
 }
 
 type SimpleMessage struct {
@@ -129,6 +135,38 @@ type AckFile struct{
 	ch			 chan bool
 }
 
+type SearchRequest struct {
+	Origin 		string
+	Budget 		uint64
+	Keywords 	[]string
+}
+
+type SearchReply struct {
+	Origin 		string
+	Destination string
+	HopLimit 	uint32
+	Results 	[]*SearchResult
+}
+
+type SearchResult struct {
+	FileName 		string
+	MetafileHash 	[]byte
+	ChunkMap 		[]uint64
+}
+
+type SearchMatch struct {
+	Filename		string
+	Metafile		[]byte
+	MetafileHash	[]byte
+	Matches			map[string][]uint64
+}
+
+type PendingSearch struct {
+	Is_pending		bool
+	Nb_match		int
+	ch				chan bool
+}
+
 /**
 Constructor of Gossiper
 */
@@ -150,13 +188,22 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 
 	var s []PeerStatus
 	var a []PeerMessage
+	var sm []SearchMatch
 	var pa = make(map[string][]PrivateMessage)
 	var pending_file_tab = make(map[string][]File)
 	var ra = make(map[string][]AckRumor)
 	var fa = make(map[string][]AckFile)
+	var srt = make(map[string]bool)
 	elementMap := make(map[string]bool)
 	for i := 0; i < len(peers); i++ {
 		elementMap[peers[i]] = true
+	}
+	
+	var chann chan bool
+	ps := PendingSearch{
+		Is_pending: false,
+		Nb_match:	0,
+		ch:			chann,		
 	}
 	fmt.Println(elementMap)
 	dsdv := make(map[string]string)
@@ -176,6 +223,9 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		file_pending:	  pending_file_tab,
 		rumor_acks:		  ra,
 		file_acks:		  fa,
+		search_req_timeout: srt,
+		search_matches:	  sm,
+		pending_search:	  ps,
 	}
 }
 
@@ -291,6 +341,4 @@ func downloadPrint(filename string, chunk_nb int, origin string){
 		fmt.Println("DOWNLOADING metafile of "+ filename+" from "+origin)
 	}
 }
-
-
 

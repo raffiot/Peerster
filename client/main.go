@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net"
-
+	"strings"
 	"github.com/dedis/protobuf"
 )
 
@@ -13,6 +13,7 @@ type ClientPacket struct {
 	Simple  *SimpleMessage
 	Private *PrivateMessage
 	File 	*FileMessage
+	Search	*SearchRequest
 }
 
 type FileMessage struct {
@@ -50,6 +51,13 @@ type StatusPacket struct {
 	Want []PeerStatus
 }
 
+type SearchRequest struct {
+	Origin 		string
+	Budget 		uint64
+	Keywords 	[]string
+}
+
+
 func main() {
 	gossiperAddr := "127.0.0.1"
 	uiport := flag.String("UIPort", "8080", "port for the UI client (default \"8080\")")
@@ -58,6 +66,8 @@ func main() {
 	msg := flag.String("msg", "", "message to be send")
 	req := flag.String("request","","request a chunk or metafile of this hash")
 	clientport := flag.String("ClientPort", "10010", "port for the client to communicate with gossiper (default \"10010\")")
+	keywords := flag.String("keywords","","filename keywords the client wants to search")
+	budget := flag.Int("budget",0,"Optional parameter to specify the ring of search")
 
 	flag.Parse()
 	var pkt_to_enc ClientPacket
@@ -76,7 +86,13 @@ func main() {
 			Filename:		*file,
 			Request:		*req,
 		}}
-	
+	}else if *keywords != ""{
+		keywords_tab := strings.Split(*keywords, ",")
+		pkt_to_enc = ClientPacket{Search: &SearchRequest{
+			Origin: 		"",
+			Budget:			uint64(*budget),
+			Keywords:		keywords_tab,
+		}}
 	}else {
 		pkt_to_enc = ClientPacket{Simple: &SimpleMessage{
 			OriginalName:  "client",

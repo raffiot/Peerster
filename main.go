@@ -55,30 +55,38 @@ func (g *Gossiper) gossiper_handler() {
 				//Process packet
 				if pkt.Simple != nil {
 
-					g.handleSimplePacketG(pkt.Simple, sender)
+					go g.handleSimplePacketG(pkt.Simple, sender)
 				} else if pkt.Status != nil {
 
-					g.StatusPacketRoutine(pkt.Status, sender)
+					go g.StatusPacketRoutine(pkt.Status, sender)
 				} else if pkt.Rumor != nil {
 
 					if (sender_formatted != ParseIPStr(g.udp_address)) && (pkt.Rumor.Text != "") {
 						printRumorMessageRcv(pkt.Rumor, sender)
 						g.listAllKnownPeers()
 					}
-					g.rumorMessageRoutine(pkt.Rumor, sender)
+					go g.rumorMessageRoutine(pkt.Rumor, sender)
 				} else if pkt.Private != nil {
-					g.privateMessageRoutine(pkt.Private)
+					go g.privateMessageRoutine(pkt.Private)
 				} else if pkt.DataRequest != nil {
 					if pkt.DataRequest.Destination == g.Name {
-						g.receive_file_request_for_me(pkt.DataRequest)
+						go g.receive_file_request_for_me(pkt.DataRequest)
 					} else {
-						g.forward_data_msg(&pkt)
+						go g.forward_data_msg(&pkt)
 					}
 				} else if pkt.DataReply != nil {
 					if pkt.DataReply.Destination == g.Name {
-						g.receive_file_reply_for_me(pkt.DataReply)
+						go g.receive_file_reply_for_me(pkt.DataReply)
 					} else {
-						g.forward_data_msg(&pkt)
+						go g.forward_data_msg(&pkt)
+					}
+				} else if pkt.SearchRequest != nil {
+					go g.receive_search_request(pkt.SearchRequest)
+				} else if pkt.SearchReply != nil {
+					if pkt.SearchReply.Destination == g.Name{
+						go g.search_reply_for_me(pkt.SearchReply)
+					} else {
+						go g.fwd_search_reply(pkt.SearchReply)
 					}
 				} else {
 					fmt.Println("Error malformed gossip packet")

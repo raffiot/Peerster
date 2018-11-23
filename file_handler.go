@@ -225,6 +225,18 @@ func (g *Gossiper) requestFile(pkt *FileMessage) {
 }
 
 func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply) {
+	//CHECK IF ANSWER IS FOR PENDING SEARCH
+	mutex.Lock()
+	//Check if metafile is for search and not for normal request
+	for i,sm := range g.search_matches{
+		if bytes.Equal(pkt.HashValue, sm.MetafileHash){
+			g.search_matches[i].Metafile = pkt.Data
+			downloadPrint(g.search_matches[i].Filename, 0, pkt.Origin)
+		}
+	}
+	mutex.Unlock()
+	
+	
 	var ack_file AckFile
 	have_ack_file := false
 	mutex.Lock()
@@ -236,7 +248,7 @@ func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply) {
 	}
 	mutex.Unlock()
 
-	if pkt.Data != nil {
+	if pkt.Data != nil && len(pkt.Data) > 0 {
 		var newPkt GossipPacket
 
 		mutex.Lock()
