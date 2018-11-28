@@ -6,25 +6,25 @@ import (
 	"math/rand"
 	"net"
 	"strconv"
+	"strings"
 )
 
-
 type GossipPacket struct {
-	Simple  *SimpleMessage
-	Rumor   *RumorMessage
-	Status  *StatusPacket
-	Private *PrivateMessage
-	DataRequest *DataRequest
-    DataReply   *DataReply
+	Simple        *SimpleMessage
+	Rumor         *RumorMessage
+	Status        *StatusPacket
+	Private       *PrivateMessage
+	DataRequest   *DataRequest
+	DataReply     *DataReply
 	SearchRequest *SearchRequest
-	SearchReply	*SearchReply
+	SearchReply   *SearchReply
 }
 
 type ClientPacket struct {
 	Simple  *SimpleMessage
 	Private *PrivateMessage
-	File 	*FileMessage
-	Search	*SearchRequest
+	File    *FileMessage
+	Search  *SearchRequest
 }
 
 /**
@@ -44,22 +44,22 @@ type Gossiper struct {
 	udp_address *net.UDPAddr
 	conn        *net.UDPConn
 
-	Name             string
-	set_of_peers     map[string]bool
-	vector_clock     []PeerStatus
-	archives         []PeerMessage
-	archives_private map[string][]PrivateMessage
-	DSDV             map[string]string
-	simple           bool
-	clientConn       *net.UDPConn
-	clientAddr       *net.UDPAddr
-	rtimer           int
-	file_pending	 map[string][]File
-	rumor_acks		 map[string][]AckRumor
-	file_acks		 map[string][]AckFile
+	Name               string
+	set_of_peers       map[string]bool
+	vector_clock       []PeerStatus
+	archives           []PeerMessage
+	archives_private   map[string][]PrivateMessage
+	DSDV               map[string]string
+	simple             bool
+	clientConn         *net.UDPConn
+	clientAddr         *net.UDPAddr
+	rtimer             int
+	file_pending       map[string][]File
+	rumor_acks         map[string][]AckRumor
+	file_acks          map[string][]AckFile
 	search_req_timeout map[string]bool
-	search_matches	 []SearchMatch
-	pending_search	 PendingSearch
+	search_matches     []SearchMatch
+	pending_search     PendingSearch
 }
 
 type SimpleMessage struct {
@@ -76,8 +76,8 @@ type RumorMessage struct {
 
 type FileMessage struct {
 	Destination string
-	Filename 	string
-	Request		string
+	Filename    string
+	Request     string
 }
 
 type PrivateMessage struct {
@@ -102,69 +102,69 @@ type PeerMessage struct {
 	msgs       map[uint32]*RumorMessage
 }
 
-type File struct{
-	Filename	string
-	Filesize 	int
-	Metafile	[]byte
-	Metahash 	[]byte
+type File struct {
+	Filename string
+	Filesize int
+	Metafile []byte
+	Metahash []byte
 }
 
 type DataRequest struct {
-	Origin string
+	Origin      string
 	Destination string
-	HopLimit uint32
-	HashValue []byte
+	HopLimit    uint32
+	HashValue   []byte
 }
 
 type DataReply struct {
-	Origin string
+	Origin      string
 	Destination string
-	HopLimit uint32
-	HashValue []byte
-	Data []byte
+	HopLimit    uint32
+	HashValue   []byte
+	Data        []byte
 }
 
 type AckRumor struct {
-	Identifier 	string
-	NextID 		uint32
-	ch			chan bool
-} 
+	Identifier string
+	NextID     uint32
+	ch         chan bool
+}
 
-type AckFile struct{
+type AckFile struct {
 	HashExpected string
-	ch			 chan bool
+	ch           chan bool
 }
 
 type SearchRequest struct {
-	Origin 		string
-	Budget 		uint64
-	Keywords 	[]string
+	Origin   string
+	Budget   uint64
+	Keywords []string
 }
 
 type SearchReply struct {
-	Origin 		string
+	Origin      string
 	Destination string
-	HopLimit 	uint32
-	Results 	[]*SearchResult
+	HopLimit    uint32
+	Results     []*SearchResult
 }
 
 type SearchResult struct {
-	FileName 		string
-	MetafileHash 	[]byte
-	ChunkMap 		[]uint64
+	FileName     string
+	MetafileHash []byte
+	ChunkMap     []uint64
 }
 
 type SearchMatch struct {
-	Filename		string
-	Metafile		[]byte
-	MetafileHash	[]byte
-	Matches			map[string][]uint64
+	Filename     string
+	Metafile     []byte
+	MetafileHash []byte
+	Matches      map[string][]uint64
 }
 
 type PendingSearch struct {
-	Is_pending		bool
-	Nb_match		int
-	ch				chan bool
+	Is_pending bool
+	Nb_match   int
+	ch         chan bool
 }
 
 /**
@@ -198,38 +198,36 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 	for i := 0; i < len(peers); i++ {
 		elementMap[peers[i]] = true
 	}
-	
+
 	var chann chan bool
 	ps := PendingSearch{
 		Is_pending: false,
-		Nb_match:	0,
-		ch:			chann,		
+		Nb_match:   0,
+		ch:         chann,
 	}
 	fmt.Println(elementMap)
 	dsdv := make(map[string]string)
 	return &Gossiper{
-		udp_address:      udpAddr,
-		conn:             udpConn,
-		Name:             name,
-		set_of_peers:     elementMap,
-		vector_clock:     s,
-		archives:         a,
-		archives_private: pa,
-		DSDV:             dsdv,
-		simple:           simple,
-		clientConn:       udpConnClient,
-		clientAddr:       udpAddrClient,
-		rtimer:           timer,
-		file_pending:	  pending_file_tab,
-		rumor_acks:		  ra,
-		file_acks:		  fa,
+		udp_address:        udpAddr,
+		conn:               udpConn,
+		Name:               name,
+		set_of_peers:       elementMap,
+		vector_clock:       s,
+		archives:           a,
+		archives_private:   pa,
+		DSDV:               dsdv,
+		simple:             simple,
+		clientConn:         udpConnClient,
+		clientAddr:         udpAddrClient,
+		rtimer:             timer,
+		file_pending:       pending_file_tab,
+		rumor_acks:         ra,
+		file_acks:          fa,
 		search_req_timeout: srt,
-		search_matches:	  sm,
-		pending_search:	  ps,
+		search_matches:     sm,
+		pending_search:     ps,
 	}
 }
-
-
 
 /**
 This function return the UDPAddr of a peer chose randomly
@@ -331,14 +329,24 @@ func (g *Gossiper) printDSDV() {
 
 }
 
-func downloadPrint(filename string, chunk_nb int, origin string){
+func downloadPrint(filename string, chunk_nb int, origin string) {
 	if chunk_nb >= 0 {
 		str := fmt.Sprint(chunk_nb)
-		fmt.Println("DOWNLOADING "+filename+ " chunk "+str+ " from " + origin)
+		fmt.Println("DOWNLOADING " + filename + " chunk " + str + " from " + origin)
 	} else if chunk_nb == -1 {
-		fmt.Println("RECONSTRUCTED file "+filename)
+		fmt.Println("RECONSTRUCTED file " + filename)
 	} else if chunk_nb == -2 {
-		fmt.Println("DOWNLOADING metafile of "+ filename+" from "+origin)
+		fmt.Println("DOWNLOADING metafile of " + filename + " from " + origin)
 	}
 }
 
+func searchPrint(filename string, origin string, metafile []byte, chunks []uint64) {
+	fmt.Println("FOUND match " + filename + " at " + origin + " metafile=" + string(metafile[:]) + " chunks=" + arrayToString(chunks, ","))
+
+}
+
+func arrayToString(a []uint64, delim string) string {
+	return strings.Trim(strings.Replace(fmt.Sprint(a), " ", delim, -1), "[]")
+	//return strings.Trim(strings.Join(strings.Split(fmt.Sprint(a), " "), delim), "[]")
+	//return strings.Trim(strings.Join(strings.Fields(fmt.Sprint(a)), delim), "[]")
+}
