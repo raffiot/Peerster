@@ -152,11 +152,11 @@ type SearchResult struct {
 	FileName     string
 	MetafileHash []byte
 	ChunkMap     []uint64
+	ChunkCount	 uint64
 }
 
 type SearchMatch struct {
 	Filename     string
-	Metafile     []byte
 	MetafileHash []byte
 	Matches      map[string][]uint64
 }

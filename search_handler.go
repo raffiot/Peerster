@@ -42,63 +42,61 @@ func (g *Gossiper) fwd_search_reply(pkt *SearchReply) {
 	}
 }
 
-func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
-	for _, sr := range pkt.Results {
-		new_file := true
+func (g *Gossiper) checkMatchComplete(matches map[string][]uint64, chunkCount uint64)bool{
+	var set map[uint64]bool
+	for _, v := range matches  {
+		for _, chunk_nb := range v {
+			set[chunk_nb] = true
+		}
+	}
+	
+	return len(set) == int(chunkCount)
+}
 
+
+
+func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
+	for _, searchResultIn := range pkt.Results {
+		new_file := true
+		matchComplete := false
 		mutex.Lock()
 		for i, match := range g.search_matches {
-			if bytes.Equal(match.MetafileHash, sr.MetafileHash) {
+			if bytes.Equal(match.MetafileHash, searchResultIn.MetafileHash) {
 				new_file = false
-
-				g.search_matches[i].Matches[pkt.Origin] = sr.ChunkMap
-				var set map[uint64]bool
-				for _, v := range g.search_matches[i].Matches {
-					for _, chunk_nb := range v {
-						set[chunk_nb] = true
-					}
-				}
-				// len(g.search_matches[i].Metafile) / 32 is my chunk number
-				if len(match.Metafile) > 0 && len(set) == len(g.search_matches[i].Metafile)/32 {
-					g.pending_search.Nb_match += 1
-					if g.pending_search.Nb_match >= 2 {
-						//Search finished because we found 2 match
-						if g.pending_search.ch != nil {
-							g.pending_search.ch <- true
-						}
-						g.pending_search.Is_pending = false
-						g.pending_search.Nb_match = 0
-						fmt.Println("SEARCH FINISHED")
-					}
-				}
+				g.search_matches[i].Matches[pkt.Origin] = searchResultIn.ChunkMap
+				matchComplete = g.checkMatchComplete(g.search_matches[i].Matches,searchResultIn.ChunkCount)
+				
+				
 
 			}
 		}
 		if new_file {
 			//Add new entry to g.search_matches
 			var matches map[string][]uint64
-			var metafile []byte
-			metafileHash := make([]byte, len(sr.MetafileHash))
-			copy(metafileHash, sr.MetafileHash)
-			matches[pkt.Origin] = sr.ChunkMap
+			metafileHash := make([]byte, len(searchResultIn.MetafileHash))
+			copy(metafileHash, searchResultIn.MetafileHash)
+			matches[pkt.Origin] = searchResultIn.ChunkMap
 			sm := SearchMatch{
-				Filename:     sr.FileName,
-				Metafile:     metafile,
+				Filename:     searchResultIn.FileName,
 				MetafileHash: metafileHash,
 				Matches:      matches,
 			}
 			g.search_matches = append(g.search_matches, sm)
-
-			//Download metafile
-			tmp := make([]byte, len(sr.MetafileHash))
-			copy(tmp, sr.MetafileHash)
-			newPkt := GossipPacket{DataRequest: &DataRequest{
-				Origin:      g.Name,
-				Destination: pkt.Origin,
-				HopLimit:    HOP_LIMIT,
-				HashValue:   tmp,
-			}}
-			g.sendDataPacket(newPkt)
+			
+			matchComplete = g.checkMatchComplete(sm.Matches,searchResultIn.ChunkCount)
+		}
+		
+		if matchComplete {
+			g.pending_search.Nb_match += 1
+			if g.pending_search.Nb_match >= 2 {
+				//Search finished because we found 2 match
+				if g.pending_search.ch != nil {
+					g.pending_search.ch <- true
+				}
+				g.pending_search.Is_pending = false
+				g.pending_search.Nb_match = 0
+				fmt.Println("SEARCH FINISHED")
+			}
 		}
 		mutex.Unlock()
 	}
@@ -324,10 +322,12 @@ func read_files_for_search(matching_files []string) []*SearchResult {
 			sha_256 := sha256.New()
 			sha_256.Write(metafile)
 			metafileHash := sha_256.Sum(nil)
+			chcount := uint64(len(metafile)/32)
 			sr_file := SearchResult{
 				FileName:     k,
 				MetafileHash: metafileHash,
 				ChunkMap:     chunks,
+				ChunkCount:	  chcount,
 			}
 
 			sr = append(sr, &sr_file)
