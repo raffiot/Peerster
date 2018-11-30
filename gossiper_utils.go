@@ -59,7 +59,7 @@ type Gossiper struct {
 	rumor_acks         RumorAcks
 	search_req_timeout map[string]bool
 	search_matches     SearchMatches
-	pending_search     PendingSearch
+	pending_search     PendingSearches
 }
 
 type Rumor_state struct {
@@ -198,11 +198,16 @@ type SearchMatches struct {
 	m		sync.Mutex
 }
 
+type PendingSearches struct {
+	ps	[]*PendingSearch
+	m	sync.Mutex
+}
+
 type PendingSearch struct {
 	Is_pending bool
 	Nb_match   int
 	ch         chan bool
-	m	sync.Mutex
+	keywords   []string
 }
 
 
@@ -258,13 +263,11 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		m: mutex4,
 	}
 
-	var chann chan bool
+	var pendings []*PendingSearch
 	var mutex2 = sync.Mutex{}
-	ps := PendingSearch{
-		Is_pending: false,
-		Nb_match:   0,
-		ch:         chann,
-		m:	    mutex2,
+	ps := PendingSearches{
+		ps: pendings,
+		m: mutex2,
 	}
 
 	var mutex3 = sync.Mutex{}

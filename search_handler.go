@@ -61,6 +61,13 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 	sm_copy := make([]SearchMatch, len(g.search_matches.sm))
 	copy(sm_copy,g.search_matches.sm)
 	g.search_matches.m.Unlock()
+
+	if len(pkt.Results) == 0 {
+		return
+	}
+	
+	
+
 	for _, searchResultIn := range pkt.Results {
 		new_file := true
 		matchComplete := false
@@ -94,16 +101,33 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 		
 		fmt.Println(matchComplete)
 		if matchComplete {
+
+			var pending_search *PendingSearch
+			ps_index := -1
 			g.pending_search.m.Lock()
-			g.pending_search.Nb_match += 1
-			if g.pending_search.Nb_match >= 2 {
-				//Search finished because we found 2 match
-				if g.pending_search.ch != nil {
-					g.pending_search.ch <- true
+
+			for i,ps := range g.pending_search.ps {
+				for _,k := range ps.keywords {
+					re := regexp.MustCompile(".*" + k + ".*")
+					if re.MatchString(searchResultIn.FileName) {
+						pending_search = ps
+						ps_index = i
+					}
+				} 
+			}
+			if ps_index >= 0 { //We have a pending search for this file
+				pending_search.Nb_match += 1
+				if pending_search.Nb_match >= 2 {
+					//Search finished because we found 2 match
+					if pending_search.ch != nil {
+						pending_search.ch <- true
+					}
+					//We remove the pending search
+					g.pending_search.ps = append(g.pending_search.ps[:ps_index], g.pending_search.ps[ps_index+1:]...)
+					fmt.Println("SEARCH FINISHED")
 				}
-				g.pending_search.Is_pending = false
-				g.pending_search.Nb_match = 0
-				fmt.Println("SEARCH FINISHED")
+			} else {
+				fmt.Println(searchResultIn.FileName +" didn't match any pending search")
 			}
 			g.pending_search.m.Unlock()
 		}
@@ -209,14 +233,13 @@ func (g *Gossiper) propagate_search(pkt *SearchRequest) {
 	}
 }
 
-func (g *Gossiper) search_routine(pkt *SearchRequest) {
+func (g *Gossiper) search_routine(pkt *SearchRequest, ch chan bool) {
 	budget := 2
 	finish := false
 
 	for !finish {
 		select {
-		case _ = <-g.pending_search.ch:
-			g.pending_search.ch = nil
+		case _ = <-ch:
 			finish = true
 		case <-time.After(1 * time.Second):
 			fmt.Println("Budget " + string(budget))

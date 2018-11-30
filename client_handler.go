@@ -158,24 +158,27 @@ func (g *Gossiper) private_packet_handler_client(pkt *PrivateMessage) {
 
 func (g *Gossiper) search_packet_handler(pkt *SearchRequest){
 
-	var sm []SearchMatch
 	var ch chan bool
-	g.pending_search.m.Lock()
-	g.pending_search.Is_pending = true
-	g.pending_search.Nb_match = 0
 	if pkt.Budget == 0 {
 		ch = make(chan bool)
 	}
-	g.pending_search.ch = ch
+	ps := &PendingSearch{
+		Is_pending: true,
+		Nb_match: 0,
+		ch: ch,
+		keywords: pkt.Keywords,
+	}
+	g.pending_search.m.Lock()
+	g.pending_search.ps = append(g.pending_search.ps,ps)
 	g.pending_search.m.Unlock()
 
-	g.search_matches.m.Lock()
-	g.search_matches.sm = sm //Clear old search_matches
-	g.search_matches.m.Unlock()
+	//g.search_matches.m.Lock()
+	//g.search_matches.sm = sm //Clear old search_matches
+	//g.search_matches.m.Unlock()
 
 	pkt.Origin = g.Name 
 	if pkt.Budget == 0 {
-		go g.search_routine(pkt)
+		go g.search_routine(pkt,ch)
 	} else {
 		// May be we want to send to all peers with same budget?
 		fmt.Println("Propagating search " +pkt.Keywords[0])	
