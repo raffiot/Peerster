@@ -13,18 +13,18 @@ func (g *Gossiper) privateMessageRoutine(pkt *PrivateMessage) {
 	name := g.Name
 	
 	if pkt.Destination == name {
-		_, ok := g.archives_private[pkt.Origin]
+		_, ok := g.archives_private.archives[pkt.Origin]
 		if !ok {
 			var new_array []PrivateMessage
-			g.archives_private[pkt.Origin] = new_array
+			g.archives_private.archives[pkt.Origin] = new_array
 		}
 		printPrivateMessageRcv(pkt)
-		mutex.Lock()
-		g.archives_private[pkt.Origin] = append(g.archives_private[pkt.Origin], *pkt)
-		mutex.Unlock()
+		g.archives_private.m.Lock()
+		g.archives_private.archives[pkt.Origin] = append(g.archives_private.archives[pkt.Origin], *pkt)
+		g.archives_private.m.Unlock()
 	} else {
 		
-		dst, ok := g.DSDV[pkt.Destination]
+		dst, ok := g.dsdv.state[pkt.Destination]
 
 		if !ok {
 			fmt.Println("Cannot forward message because destination unknown")

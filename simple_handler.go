@@ -32,7 +32,7 @@ func (g *Gossiper) handleSimplePacketG(pkt *SimpleMessage, sender *net.UDPAddr) 
 	}
 	g.listAllKnownPeers()
 	
-	for k := range g.set_of_peers {
+	for k := range g.set_of_peers.set {
 		if k != sender_formatted {
 			dst, err := net.ResolveUDPAddr("udp4", k)
 			if err != nil {

@@ -35,13 +35,10 @@ func (g *Gossiper) loadFile(filename string) {
 
 	// get the size
 	filesize := int(fi.Size())
-	//Create containers
-	//sha_256 := sha256.New()
 
-	//32*int(math.Ceil(float64(filesize)/float64(8)))
+
 
 	var metafile []byte
-	//chunks := make([][]byte,0,int(ceil(fileSize/8)))
 
 	file_size_rem := filesize
 	//repeat read as long as there is data
@@ -58,7 +55,6 @@ func (g *Gossiper) loadFile(filename string) {
 			fmt.Println(err)
 			return
 		}
-		//chunks = append(chunks,buf)
 
 		sha_256 := sha256.New()
 		sha_256.Write(buf)
@@ -116,7 +112,7 @@ func (g *Gossiper) receive_file_request_for_me(pkt *DataRequest) {
 		}
 
 	}
-	fmt.Println(buf)
+
 	newPkt := GossipPacket{DataReply: &DataReply{
 		Origin:      g.Name,
 		Destination: pkt.Origin,
@@ -135,9 +131,9 @@ func (g *Gossiper) forward_data_msg(pkt *GossipPacket) {
 		var ok bool
 
 		if pkt.DataRequest != nil {
-			next_hop, ok = g.DSDV[pkt.DataRequest.Destination]
+			next_hop, ok = g.dsdv.state[pkt.DataRequest.Destination]
 		} else {
-			next_hop, ok = g.DSDV[pkt.DataReply.Destination]
+			next_hop, ok = g.dsdv.state[pkt.DataReply.Destination]
 		}
 
 		if ok {
@@ -183,7 +179,39 @@ func (g *Gossiper) requestFile(pkt *FileMessage) {
 
 	tmp, _ := hex.DecodeString(pkt.Request)
 
-	go g.fileTimeout(pkt.Destination, pkt.Request)
+	
+
+	
+
+	//_, ok := g.file_pending.pf[pkt.Destination]
+	chann := make(chan bool)
+	ack := AckFile{
+		hashExpected:	pkt.Request,
+		dest:	pkt.Destination,
+		ch:		chann,		
+	}
+
+	f := &File{
+		Filename: pkt.Filename,
+		Filesize: 0,
+		Metafile: nil,
+		Metahash: tmp,
+		FromDests: nil,
+		ack: ack,
+	}
+	g.file_pending.m.Lock()
+	g.file_pending.pf[pkt.Request] = f
+	g.file_pending.m.Unlock()
+	
+	go g.fileTimeout(&ack)
+	
+	if _, err := os.Stat("./_Downloads/" + pkt.Filename); !os.IsNotExist(err) {
+		err = os.Remove("./_Downloads/" + pkt.Filename)
+		if err != nil {
+			fmt.Println("couldn't remove file")
+			return
+		}
+	}
 
 	newPkt := GossipPacket{DataRequest: &DataRequest{
 		Origin:      g.Name,
@@ -194,187 +222,142 @@ func (g *Gossiper) requestFile(pkt *FileMessage) {
 
 	g.sendDataPacket(newPkt)
 
-	_, ok := g.file_pending[pkt.Destination]
-	f := File{
-		Filename: pkt.Filename,
-		Filesize: 0,
-		Metafile: nil,
-		Metahash: tmp,
-	}
-	if ok {
-		mutex.Lock()
-		g.file_pending[pkt.Destination] = append(g.file_pending[pkt.Destination], f)
-		mutex.Unlock()
-	} else {
-		var new_array []File
-		new_array = append(new_array, f)
-		mutex.Lock()
-		g.file_pending[pkt.Destination] = new_array
-		mutex.Unlock()
-	}
-
-	if _, err := os.Stat("./_Downloads/" + pkt.Filename); !os.IsNotExist(err) {
-		err = os.Remove("./_Downloads/" + pkt.Filename)
-		if err != nil {
-			fmt.Println("couldn't remove file")
-			return
-		}
-	}
-
 	downloadPrint(pkt.Filename, -2, pkt.Destination)
+}
+
+func writeChunk(file_title string, data []byte){
+	err := ioutil.WriteFile("./._Chunks/"+file_title, data, 0644)
+	if err != nil {
+		fmt.Println("Error during write of hash")
+		fmt.Println(err)
+		return
+	}
+}
+
+func writeFile(filename string, data []byte){
+	f, err := os.OpenFile("./_Downloads/"+filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if _, err := f.Write(data); err != nil {
+		log.Fatal(err)
+	}
+	if err := f.Close(); err != nil {
+		log.Fatal(err)
+	}
 }
 
 func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply) {
 	
-	var ack_file AckFile
-	have_ack_file := false
-	mutex.Lock()
-	for i, _ := range g.file_acks[pkt.Origin] {
-		if g.file_acks[pkt.Origin][i].HashExpected == hex.EncodeToString(pkt.HashValue) {
-			ack_file = g.file_acks[pkt.Origin][i]
-			have_ack_file = true
+
+	var currentFile *File 
+	hash_received := hex.EncodeToString(pkt.HashValue)
+
+	var file_metahash string
+
+	g.file_pending.m.Lock()
+	// Check if with map it don't give me a copy so modification on ack_file won't modify state
+	for key, file := range g.file_pending.pf {
+		if file.ack.hashExpected ==  hash_received {
+			currentFile = file
+			file_metahash = key
 		}
 	}
-	mutex.Unlock()
+	g.file_pending.m.Unlock()
 
-	if pkt.Data != nil && len(pkt.Data) > 0 {
-		var newPkt GossipPacket
+	if pkt.Data != nil && len(pkt.Data) > 0 && currentFile != nil{
+		var newPkt *GossipPacket
+		
+		if currentFile.Metafile != nil{
+			//We receive a chunk
+			pkt_waited := currentFile.Filesize / 256
+			if bytes.Equal(pkt.HashValue, currentFile.Metafile[pkt_waited:pkt_waited+32]){
+				writeChunk(hash_received, pkt.Data)
+				writeFile(currentFile.Filename,pkt.Data)
+				if pkt_waited+32 >= len(currentFile.Metafile) {
+					//It was the last packet we waited for this file
+					downloadPrint(currentFile.Filename, (pkt_waited+32)/32, pkt.Origin)
+					downloadPrint(currentFile.Filename, -1, "")
+					g.file_pending.m.Lock()
+					currentFile.ack.hashExpected = ""
+					currentFile.ack.ch <- false
 
-		mutex.Lock()
-		pending_array := make([]File, len(g.file_pending[pkt.Origin]))
-		copy(pending_array, g.file_pending[pkt.Origin])
-		mutex.Unlock()
+					// I withdraw current file from pending files map
+					delete(g.file_pending.pf,file_metahash)
+					g.file_pending.m.Unlock()
 
-		index := -1
-		found := false
-		for i, _ := range pending_array {
+					
+					
+				} else {
 
-			if bytes.Equal(pkt.HashValue, pending_array[i].Metahash) {
+					currentFile.Filesize += 8192
 
-				//We received first packet for a file
-				arr := make([]byte, len(pkt.Data))
-				copy(arr, pkt.Data)
-				pending_array[i].Metafile = arr
-				downloadPrint(pending_array[i].Filename, 0, pkt.Origin)
-				fmt.Println(pending_array[i])
-				fmt.Println(pkt)
-				newPkt = GossipPacket{DataRequest: &DataRequest{
-					Origin:      g.Name,
-					Destination: pkt.Origin,
-					HopLimit:    HOP_LIMIT,
-					HashValue:   pending_array[i].Metafile[0:32],
-				}}
-
-				if have_ack_file {
-					mutex.Lock()
-					ack_file.HashExpected = hex.EncodeToString(pending_array[i].Metafile[0:32])
-					ack_file.ch <- true
-					mutex.Unlock()
+					pkt_wanted := currentFile.Filesize / 256
+					downloadPrint(currentFile.Filename, pkt_wanted/32, pkt.Origin)
+					newPkt = &GossipPacket{DataRequest: &DataRequest{
+						Origin:      g.Name,
+						Destination: currentFile.FromDests[pkt_wanted/32],
+						HopLimit:    HOP_LIMIT,
+						HashValue:   currentFile.Metafile[pkt_wanted : pkt_wanted+32],
+					}}
+					g.file_pending.m.Lock()
+					currentFile.ack.hashExpected = hex.EncodeToString(currentFile.Metafile[pkt_wanted : pkt_wanted+32])
+					currentFile.ack.dest = currentFile.FromDests[pkt_wanted/32]
+					currentFile.ack.ch <- true
+					g.file_pending.m.Unlock()
 				}
+			}			
+		} else {
+			//We receive metafile
+			//I copy it and store in file_pending
+			data_received := make([]byte, len(pkt.Data))
+			copy(data_received, pkt.Data)
+			nb_chunks := len(data_received)/32				
+			g.file_pending.m.Lock()
+			currentFile.Metafile = data_received
 
-				f, err := os.OpenFile("./._Chunks/"+hex.EncodeToString(pkt.HashValue), os.O_CREATE|os.O_WRONLY, 0644)
-				if err != nil {
-					fmt.Println("Error when loading the file")
-					log.Fatal(err)
-					return
-				}
-				if _, err := f.Write(pkt.Data); err != nil {
-					log.Fatal(err)
-				}
-				if err := f.Close(); err != nil {
-					log.Fatal(err)
-				}
-
-				found = true
-				break
-			} else if pending_array[i].Metafile != nil {
-
-				pkt_waited := pending_array[i].Filesize / 256
-
-				//If the packet we receive is confirmed to be the next because the hash is the good one
-				if bytes.Equal(pkt.HashValue, pending_array[i].Metafile[pkt_waited:pkt_waited+32]) {
-
-					found = true
-					err := ioutil.WriteFile("./._Chunks/"+hex.EncodeToString(pkt.HashValue), pkt.Data, 0644)
-					if err != nil {
-						fmt.Println("Error during write of hash")
-						fmt.Println(err)
-						return
-					}
-
-					f, err := os.OpenFile("./_Downloads/"+pending_array[i].Filename, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-					if _, err := f.Write(pkt.Data); err != nil {
-						log.Fatal(err)
-					}
-					if err := f.Close(); err != nil {
-						log.Fatal(err)
-					}
-
-					if pkt_waited+32 >= len(pending_array[i].Metafile) {
-						//It was the last packet we waited for this file
-						downloadPrint(pending_array[i].Filename, (pkt_waited+32)/32, pkt.Origin)
-						downloadPrint(pending_array[i].Filename, -1, "")
-						index = i
-						if have_ack_file {
-							mutex.Lock()
-							ack_file.HashExpected = ""
-							ack_file.ch <- false
-							mutex.Unlock()
-						}
-					} else {
-
-						pending_array[i].Filesize += 8192
-
-						pkt_wanted := pending_array[i].Filesize / 256
-						downloadPrint(pending_array[i].Filename, pkt_wanted/32, pkt.Origin)
-						newPkt = GossipPacket{DataRequest: &DataRequest{
-							Origin:      g.Name,
-							Destination: pkt.Origin,
-							HopLimit:    HOP_LIMIT,
-							HashValue:   pending_array[i].Metafile[pkt_wanted : pkt_wanted+32],
-						}}
-						if have_ack_file {
-							mutex.Lock()
-							ack_file.HashExpected = hex.EncodeToString(pending_array[i].Metafile[pkt_wanted : pkt_wanted+32])
-							ack_file.ch <- true
-							mutex.Unlock()
-						}
-					}
-					break
-				}
-
+			//If we didn't know about this file from search we will ack all file to same node
+			if currentFile.FromDests == nil {
+				from_dest := make([]string,nb_chunks)
+				for i:=0; i < nb_chunks; i++ {
+					from_dest[i] = pkt.Origin
+				}			
+				currentFile.FromDests = from_dest
 			}
+			currentFile.ack.dest = currentFile.FromDests[0]
+			currentFile.ack.hashExpected = hex.EncodeToString(currentFile.Metafile[0:32])
+			currentFile.ack.ch <- true
+			g.file_pending.m.Unlock()
+				
+			downloadPrint(currentFile.Filename, 0, pkt.Origin)
+			newPkt = &GossipPacket{DataRequest: &DataRequest{
+				Origin:      g.Name,
+				Destination: currentFile.FromDests[0],
+				HopLimit:    HOP_LIMIT,
+				HashValue:   currentFile.Metafile[0:32],
+			}}
+				
+			writeChunk(hash_received, pkt.Data)
 		}
-		if index != -1 {
-			// File download has been completed
-
-			mutex.Lock()
-			pending_array = append(pending_array[:index], pending_array[index+1:]...)
-			mutex.Unlock()
-			//this should modify the reference so its okay
-			//g.file_pending[pkt.Origin] = append(g.file_pending[:index],g.file_pending[index+1:]...)
-
-		} else if found {
-			g.sendDataPacket(newPkt)
+		if newPkt != nil {
+			g.sendDataPacket(*newPkt)
 		}
-		mutex.Lock()
-		g.file_pending[pkt.Origin] = pending_array
-		mutex.Unlock()
+	} else if pkt.Data == nil && currentFile != nil {
+		
+		g.file_pending.m.Lock()
+		currentFile.ack.hashExpected = ""
+		currentFile.ack.ch <- false
+
+		// I withdraw current file from pending files map
+		delete(g.file_pending.pf,file_metahash)
+		g.file_pending.m.Unlock()
 	} else {
-		ack_file.ch <- false
+		fmt.Println("no match")
 	}
 
 }
 
-func (g *Gossiper) fileTimeout(dest string, hash string) {
-	chann := make(chan bool)
-	af := AckFile{
-		HashExpected: hash,
-		ch:           chann,
-	}
-	mutex.Lock()
-	g.file_acks[dest] = append(g.file_acks[dest], af)
-	mutex.Unlock()
+func (g *Gossiper) fileTimeout(ack *AckFile) {
 
 	res := true
 	for res {
@@ -382,20 +365,22 @@ func (g *Gossiper) fileTimeout(dest string, hash string) {
 		case <-time.After(time.Duration(TIMEOUT_FILE) * time.Second):
 			mutex.Lock()
 			// Is af reference still up to date??
-			tmp, _ := hex.DecodeString(af.HashExpected)
+			tmp, _ := hex.DecodeString(ack.hashExpected)
 			mutex.Unlock()
 			newPkt := GossipPacket{DataRequest: &DataRequest{
 				Origin:      g.Name,
-				Destination: dest,
+				Destination: ack.dest,
 				HopLimit:    HOP_LIMIT,
 				HashValue:   tmp,
 			}}
 			g.sendDataPacket(newPkt)
 
-		case res = <-chann:
+		case res = <-ack.ch:
 
 		}
 	}
+
+/**
 	index := -1
 	mutex.Lock()
 	for i, v := range g.file_acks[dest] {
@@ -406,7 +391,7 @@ func (g *Gossiper) fileTimeout(dest string, hash string) {
 	if index >= 0 {
 		g.file_acks[dest] = append(g.file_acks[dest][:index], g.file_acks[dest][index+1:]...)
 	}
-	mutex.Unlock()
+	mutex.Unlock()*/
 }
 
 func (g *Gossiper) sendDataPacket(pkt GossipPacket) {
@@ -424,7 +409,7 @@ func (g *Gossiper) sendDataPacket(pkt GossipPacket) {
 		fmt.Println("Error wrong use of sendDataPacket function")
 		return
 	}
-	next_hop, ok := g.DSDV[dest]
+	next_hop, ok := g.dsdv.state[dest]
 	if ok {
 		mutex.Lock()
 		g.conn.WriteToUDP(pktByte, ParseStrIP(next_hop))

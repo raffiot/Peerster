@@ -20,7 +20,7 @@ name='A'
 # General peerster (gossiper) command
 #./Peerster -UIPort=12345 -gossipAddr=127.0.0.1:5001 -name=A -peers=127.0.0.1:5002 > A.out &
 
-for i in `seq 1 2`;
+for i in `seq 1 6`;
 do
 	outFileName="$name.out"
 	peerPort=$((($i)+5000))
@@ -37,19 +37,40 @@ do
 done
 
 ./client/client -UIPort=12345 -file=test.txt
-
+./client/client -UIPort=12345 -file=espana.txt
+./client/client -UIPort=12347 -file=rimbaud.txt
 sleep 4
 
-./client/client -UIPort=12346 -keywords=es -budget=2
-
+./client/client -UIPort=12346 -keywords=es -budget=3
 
 sleep 5
 
+./client/client -UIPort=12345 -keywords=rim -budget=0
+
+sleep 5
 pkill -f Peerster
 
 failed="F"
-echo -e "${RED}###CHECK B FIND MATCH FROM A${NC}"
-if !(grep -q "FOUND match test.txt at A" "B.out") ; then
+echo -e "${RED}###CHECK B FIND MATCH FROM A for test.txt${NC}"
+if !(grep -q "FOUND match test.txt at " "B.out") ; then
+	failed="T"
+fi
+if !(grep -q "FOUND match espana.txt at " "B.out") ; then
+	failed="T"
+fi
+if !(grep -q "SEARCH FINISHED" "B.out") ; then
+	failed="T"
+fi
+
+if [[ "$failed" == "T" ]] ; then
+	echo -e "${RED}***FAILED***${NC}"
+else
+	echo -e "${GREEN}***PASSED***${NC}"
+fi
+
+failed="F"
+echo -e "${RED}###CHECK A FIND MATCH FROM C for rimbaud.txt${NC}"
+if !(grep -q "FOUND match rimbaud.txt at C" "A.out") ; then
 	failed="T"
 fi
 

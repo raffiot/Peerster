@@ -12,12 +12,17 @@ func MessageHandler(w http.ResponseWriter, r *http.Request) {
 	enableCors(&w)
 	if r.Method == "GET" {
 		var values []RumorMessage
-		
-		for i := 0; i < len(me.archives); i++ {
+
+		me.rumor_state.m.Lock()
+		my_message := make([]PeerMessage,len(me.rumor_state.archives))
+		copy(my_message,me.rumor_state.archives)
+		me.rumor_state.m.Unlock()
+
+		for i := 0; i < len(my_message); i++ {
 			finished := false
 			j := 1
 			for !finished {
-				elem, ok := me.archives[i].msgs[uint32(j)]
+				elem, ok := my_message[i].msgs[uint32(j)]
 				j++
 				if ok {
 					if elem.Text != "" {
@@ -55,7 +60,7 @@ func MessageHandler(w http.ResponseWriter, r *http.Request) {
 func NodeHandler(w http.ResponseWriter, r *http.Request) {
 	enableCors(&w)
 	if r.Method == "GET" {
-		values := me.set_of_peers
+		values := me.set_of_peers.set
 		jsonValue, _ := json.Marshal(values)
 		w.WriteHeader(http.StatusOK)
 		w.Write(jsonValue)
@@ -64,9 +69,9 @@ func NodeHandler(w http.ResponseWriter, r *http.Request) {
 		if err != nil {
 			panic(err)
 		}
-		mutex.Lock()
-		me.set_of_peers[r.Form.Get("value")] = true
-		mutex.Unlock()
+		me.set_of_peers.m.Lock()
+		me.set_of_peers.set[r.Form.Get("value")] = true
+		me.set_of_peers.m.Unlock()
 	}
 }
 
@@ -82,12 +87,12 @@ func PeerHandler(w http.ResponseWriter, r *http.Request) {
 	enableCors(&w)
 	w.WriteHeader(http.StatusOK)
 	if r.Method == "GET" {
-		mutex.Lock()
-		keys := make([]string, 0, len(me.DSDV))
-		for k := range me.DSDV {
+		//mutex.Lock()
+		keys := make([]string, 0, len(me.dsdv.state))
+		for k := range me.dsdv.state {
 			keys = append(keys, k)
 		}
-		mutex.Unlock()
+		//mutex.Unlock()
 		jsonValue, _ := json.Marshal(keys)
 		w.Write(jsonValue)
 	}
@@ -103,8 +108,8 @@ func PrivateMessageHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		
-		keys := make([]PrivateMessage, 0, len(me.archives_private[peer]))
-		for _, k := range me.archives_private[peer] {
+		keys := make([]PrivateMessage, 0, len(me.archives_private.archives[peer]))
+		for _, k := range me.archives_private.archives[peer] {
 			keys = append(keys, k)
 		}
 		

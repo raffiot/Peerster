@@ -93,6 +93,8 @@ func main() {
 			Budget:			uint64(*budget),
 			Keywords:		keywords_tab,
 		}}
+		fmt.Println("Sending request")
+		fmt.Println(keywords_tab)
 	}else {
 		pkt_to_enc = ClientPacket{Simple: &SimpleMessage{
 			OriginalName:  "client",

@@ -16,7 +16,7 @@ import (
 )
 
 func (g *Gossiper) fwd_search_reply(pkt *SearchReply) {
-	next_hop, ok := g.DSDV[pkt.Destination]
+	next_hop, ok := g.dsdv.state[pkt.Destination]
 	if ok {
 		hop := pkt.HopLimit - 1
 		newPkt := GossipPacket{SearchReply: &SearchReply{
@@ -43,7 +43,7 @@ func (g *Gossiper) fwd_search_reply(pkt *SearchReply) {
 }
 
 func (g *Gossiper) checkMatchComplete(matches map[string][]uint64, chunkCount uint64)bool{
-	var set map[uint64]bool
+	set := make(map[uint64]bool)
 	for _, v := range matches  {
 		for _, chunk_nb := range v {
 			set[chunk_nb] = true
@@ -56,15 +56,22 @@ func (g *Gossiper) checkMatchComplete(matches map[string][]uint64, chunkCount ui
 
 
 func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
+	fmt.Println("search_reply_for_me")
+	g.search_matches.m.Lock()
+	sm_copy := make([]SearchMatch, len(g.search_matches.sm))
+	copy(sm_copy,g.search_matches.sm)
+	g.search_matches.m.Unlock()
 	for _, searchResultIn := range pkt.Results {
 		new_file := true
 		matchComplete := false
-		mutex.Lock()
-		for i, match := range g.search_matches {
+		//fmt.Println("I'm heere")
+		searchPrint(searchResultIn.FileName,pkt.Origin, searchResultIn.MetafileHash, searchResultIn.ChunkMap)
+		
+		for i, match := range sm_copy {
 			if bytes.Equal(match.MetafileHash, searchResultIn.MetafileHash) {
 				new_file = false
-				g.search_matches[i].Matches[pkt.Origin] = searchResultIn.ChunkMap
-				matchComplete = g.checkMatchComplete(g.search_matches[i].Matches,searchResultIn.ChunkCount)
+				g.search_matches.sm[i].Matches[pkt.Origin] = searchResultIn.ChunkMap
+				matchComplete = g.checkMatchComplete(g.search_matches.sm[i].Matches,searchResultIn.ChunkCount)
 				
 				
 
@@ -72,7 +79,7 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 		}
 		if new_file {
 			//Add new entry to g.search_matches
-			var matches map[string][]uint64
+			matches := make(map[string][]uint64)
 			metafileHash := make([]byte, len(searchResultIn.MetafileHash))
 			copy(metafileHash, searchResultIn.MetafileHash)
 			matches[pkt.Origin] = searchResultIn.ChunkMap
@@ -81,12 +88,15 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 				MetafileHash: metafileHash,
 				Matches:      matches,
 			}
-			g.search_matches = append(g.search_matches, sm)
-			
+			g.search_matches.m.Lock()
+			g.search_matches.sm = append(g.search_matches.sm, sm)
+			g.search_matches.m.Unlock()
 			matchComplete = g.checkMatchComplete(sm.Matches,searchResultIn.ChunkCount)
 		}
 		
+		fmt.Println(matchComplete)
 		if matchComplete {
+			g.pending_search.m.Lock()
 			g.pending_search.Nb_match += 1
 			if g.pending_search.Nb_match >= 2 {
 				//Search finished because we found 2 match
@@ -97,8 +107,9 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 				g.pending_search.Nb_match = 0
 				fmt.Println("SEARCH FINISHED")
 			}
+			g.pending_search.m.Unlock()
 		}
-		mutex.Unlock()
+		
 	}
 
 	//For each search result in pkt
@@ -110,6 +121,8 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 }
 
 func (g *Gossiper) receive_search_request(pkt *SearchRequest) {
+	fmt.Println("receive search request")
+	fmt.Println(pkt)
 	var already_received bool
 
 	search_id := pkt.Origin
@@ -117,11 +130,8 @@ func (g *Gossiper) receive_search_request(pkt *SearchRequest) {
 		search_id += elem
 	}
 	fmt.Println(search_id)
-	bytes, err := hex.DecodeString(search_id)
-	if err != nil {
-		fmt.Println("sha256 hashing went wrong")
-		log.Fatal(err)
-	}
+	bytes:= []byte(search_id)
+
 	sha_256 := sha256.New()
 	sha_256.Write(bytes)
 	hash := sha_256.Sum(nil)
@@ -146,17 +156,22 @@ func (g *Gossiper) receive_search_request(pkt *SearchRequest) {
 			sr := read_files_for_search(matching_files)
 
 			if len(sr) > 0 {
-				newPkt := &SearchReply{
+				fmt.Println("found something")
+				fmt.Println(sr[0])
+				//fmt.Println(sr[1])
+				fmt.Println(pkt.Origin)
+				newPkt := GossipPacket{SearchReply: &SearchReply{
 					Origin:      g.Name,
 					Destination: pkt.Origin,
 					HopLimit:    HOP_LIMIT,
 					Results:     sr,
-				}
+				}}
 				pktByte, err := protobuf.Encode(&newPkt)
 				if err != nil {
 					log.Fatal(err)
 				}
-				next_hop, ok := g.DSDV[pkt.Origin]
+				
+				next_hop, ok := g.dsdv.state[pkt.Origin]
 				if ok {
 					mutex.Lock()
 					g.conn.WriteToUDP(pktByte, ParseStrIP(next_hop))
@@ -173,12 +188,12 @@ func (g *Gossiper) receive_search_request(pkt *SearchRequest) {
 
 func (g *Gossiper) propagate_search(pkt *SearchRequest) {
 	new_budget := int(pkt.Budget - 1)
-	if new_budget > 0 && len(g.set_of_peers) > 0 {
-		res := new_budget / len(g.set_of_peers) //int division so no need of floor
+	if new_budget > 0 && len(g.set_of_peers.set) > 0 {
+		res := new_budget / len(g.set_of_peers.set) //int division so no need of floor
 		if res > 0 {
 			// Because I don't use lock on set of peers that is append only, I could put more budget than there really is.
-			i := new_budget % len(g.set_of_peers)
-			for dest, _ := range g.set_of_peers {
+			i := new_budget % len(g.set_of_peers.set)
+			for dest, _ := range g.set_of_peers.set {
 				sending_budget := res
 				if i > 0 {
 					sending_budget += 1
@@ -206,6 +221,7 @@ func (g *Gossiper) search_routine(pkt *SearchRequest) {
 			g.pending_search.ch = nil
 			finish = true
 		case <-time.After(1 * time.Second):
+			fmt.Println("Budget " + string(budget))
 			budget *= 2
 			pkt.Budget = uint64(budget)
 			g.propagate_search(pkt)
@@ -252,6 +268,7 @@ func find_matching_files(keywords []string) []string {
 		for _, k := range keywords {
 			re := regexp.MustCompile(".*" + k + ".*")
 			if re.MatchString(f.Name()) {
+				fmt.Println(f.Name())
 				ok := contains(matching_files, f.Name())
 
 				if !ok {
@@ -260,7 +277,7 @@ func find_matching_files(keywords []string) []string {
 			}
 		}
 	}
-
+	fmt.Println(matching_files)
 	return matching_files
 }
 
@@ -268,6 +285,7 @@ func read_files_for_search(matching_files []string) []*SearchResult {
 	var sr []*SearchResult
 
 	for _, k := range matching_files {
+		fmt.Println(k)
 		var chunks []uint64
 		var metafile []byte
 
@@ -310,14 +328,13 @@ func read_files_for_search(matching_files []string) []*SearchResult {
 			hash := sha_256.Sum(nil)
 			metafile = append(metafile, hash...)
 			file_size_rem -= 8192
-
+			//I reply the file only if it has been upload before
 			if _, err := os.Stat("./._Chunks/" + hex.EncodeToString(hash)); !os.IsNotExist(err) {
 				chunks = append(chunks, chunck_counter)
 			}
 
 			chunck_counter += 1
 		}
-
 		if len(chunks) > 0 {
 			sha_256 := sha256.New()
 			sha_256.Write(metafile)

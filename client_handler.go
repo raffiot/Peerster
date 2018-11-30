@@ -43,7 +43,12 @@ func (g *Gossiper) receiveMessageFromClient() {
 					if pkt.File.Request == "" {
 						g.loadFile(pkt.File.Filename)
 					} else {
-						g.requestFile(pkt.File)
+						if pkt.File.Destination == "" {
+
+						} else {
+							g.requestFile(pkt.File)
+						}
+						
 					}
 				} else if pkt.Search != nil {
 					g.search_packet_handler(pkt.Search) //launch as subroutine?
@@ -79,7 +84,7 @@ func (g *Gossiper) handleSimplePacket(pkt *SimpleMessage) {
 		}
 		g.listAllKnownPeers()
 
-		for k := range g.set_of_peers {
+		for k := range g.set_of_peers.set {
 			dst, err := net.ResolveUDPAddr("udp4", k)
 			if err != nil {
 				fmt.Println("cannot resolve addr of ather gossiper")
@@ -93,9 +98,9 @@ func (g *Gossiper) handleSimplePacket(pkt *SimpleMessage) {
 	} else {
 		var my_ID uint32 = 1
 
-		for i := 0; i < len(g.vector_clock); i++ {
-			if g.vector_clock[i].Identifier == g.Name {
-				my_ID = g.vector_clock[i].NextID
+		for i := 0; i < len(g.rumor_state.vector_clock); i++ {
+			if g.rumor_state.vector_clock[i].Identifier == g.Name {
+				my_ID = g.rumor_state.vector_clock[i].NextID
 			}
 		}
 
@@ -126,17 +131,17 @@ func (g *Gossiper) private_packet_handler_client(pkt *PrivateMessage) {
 		HopLimit:    HOP_LIMIT,
 		}}
 	fmt.Println(pkt.Destination)
-	next_hop, ok := g.DSDV[pkt.Destination]
+	next_hop, ok := g.dsdv.state[pkt.Destination]
 
 	if ok {
-		_, ok := g.archives_private[pkt.Destination]
+		_, ok := g.archives_private.archives[pkt.Destination]
 		if !ok {
 			var new_array []PrivateMessage
-				g.archives_private[pkt.Destination] = new_array
+				g.archives_private.archives[pkt.Destination] = new_array
 			}
-			mutex.Lock()
-			g.archives_private[pkt.Destination] = append(g.archives_private[pkt.Destination], *newPkt.Private)
-			mutex.Unlock()	
+			g.archives_private.m.Lock()
+			g.archives_private.archives[pkt.Destination] = append(g.archives_private.archives[pkt.Destination], *newPkt.Private)
+			g.archives_private.m.Unlock()	
 			pktByte, err := protobuf.Encode(&newPkt)
 			if err != nil {
 				fmt.Println("Encode of the packet failed")
@@ -155,19 +160,25 @@ func (g *Gossiper) search_packet_handler(pkt *SearchRequest){
 
 	var sm []SearchMatch
 	var ch chan bool
-	mutex.Lock()
+	g.pending_search.m.Lock()
 	g.pending_search.Is_pending = true
 	g.pending_search.Nb_match = 0
 	if pkt.Budget == 0 {
 		ch = make(chan bool)
 	}
 	g.pending_search.ch = ch
-	g.search_matches = sm //Clear old search_matches
-	mutex.Unlock()
+	g.pending_search.m.Unlock()
+
+	g.search_matches.m.Lock()
+	g.search_matches.sm = sm //Clear old search_matches
+	g.search_matches.m.Unlock()
+
+	pkt.Origin = g.Name 
 	if pkt.Budget == 0 {
 		go g.search_routine(pkt)
 	} else {
-		// May be we want to send to all peers with same budget?	
+		// May be we want to send to all peers with same budget?
+		fmt.Println("Propagating search " +pkt.Keywords[0])	
 		g.propagate_search(pkt)
 	
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 var UDP_PACKET_SIZE = 2048
-var ANTI_ENTROPY_TIMER = 2 //Second
+var ANTI_ENTROPY_TIMER = 4 //Second
 var TIMEOUT_TIMER = 2      //Second
 var TIMEOUT_FILE = 5       //Second
 var HOP_LIMIT = uint32(10)
@@ -45,11 +45,11 @@ func (g *Gossiper) gossiper_handler() {
 				//Append sender to set of peers if unknown
 				sender_formatted := ParseIPStr(sender)
 
-				_, ok := g.set_of_peers[sender_formatted]
+				_, ok := g.set_of_peers.set[sender_formatted]
 				if !ok && sender_formatted != ParseIPStr(g.udp_address) {
-					mutex.Lock()
-					g.set_of_peers[sender_formatted] = true
-					mutex.Unlock()
+					g.set_of_peers.m.Lock()
+					g.set_of_peers.set[sender_formatted] = true
+					g.set_of_peers.m.Unlock()
 				}
 
 				//Process packet
@@ -98,7 +98,7 @@ func (g *Gossiper) gossiper_handler() {
 
 func (g *Gossiper) rtimer_handler() {
 	//first advisoring
-	if len(g.set_of_peers) > 0 {
+	if len(g.set_of_peers.set) > 0 {
 		dst := me.chooseRandomPeer()
 		me.sendRouteRumor(dst)
 	}
@@ -107,7 +107,7 @@ func (g *Gossiper) rtimer_handler() {
 	tickerRouting := time.NewTicker(time.Duration(g.rtimer) * time.Second)
 	for _ = range tickerRouting.C {
 
-		if len(g.set_of_peers) > 0 {
+		if len(g.set_of_peers.set) > 0 {
 			dst := g.chooseRandomPeer()
 			g.sendRouteRumor(dst)
 		}
@@ -120,8 +120,8 @@ func (g *Gossiper) anti_entropy_handler() {
 	tickerAEntropy := time.NewTicker(time.Duration(ANTI_ENTROPY_TIMER) * time.Second)
 	for _ = range tickerAEntropy.C {
 		//!receivedInTime &&
-
-		if len(g.set_of_peers) > 0 {
+		
+		if len(g.set_of_peers.set) > 0 {
 			dst := g.chooseRandomPeer()
 			g.sendMyStatus(dst, 0)
 		}
