@@ -175,6 +175,79 @@ func (g *Gossiper) forward_data_msg(pkt *GossipPacket) {
 	}
 }
 
+func (g *Gossiper) requestFileFromSearch(pkt *FileMessage) {
+	//Find match between pkt.Request and SearchMatches.sm[i]
+	//Construct slice FromDests
+	//Create File & AckFile
+	//Begin go routine
+	//Send request
+	tmp, _ := hex.DecodeString(pkt.Request)
+	var sm SearchMatch
+	found := false	
+	g.search_matches.m.Lock()
+	for _,match := range g.search_matches.sm {
+		if bytes.Equal(match.MetafileHash,tmp) {
+			sm = match
+			found = true
+			break
+		}
+	}
+	g.search_matches.m.Unlock()
+	if !found {
+		fmt.Println("No search match this request")
+		return
+	}
+	fmt.Println("matches dest")
+	fmt.Println(sm.Matches)
+	dests := make([]string,sm.ChunkCount)
+	for k,v := range sm.Matches {
+		for _,i := range v {
+			// Because chunk map start from 1 to n and not 0 to n-1
+			dests[i-1] = k
+		}
+	}
+
+	chann := make(chan bool)
+	ack := AckFile{
+		hashExpected:	pkt.Request,
+		dest:	dests[0],
+		ch:		chann,		
+	}
+
+	f := &File{
+		Filename: pkt.Filename,
+		Filesize: 0,
+		Metafile: nil,
+		Metahash: tmp,
+		FromDests: dests,
+		ack: ack,
+	}
+	g.file_pending.m.Lock()
+	g.file_pending.pf[pkt.Request] = f
+	g.file_pending.m.Unlock()
+
+	go g.fileTimeout(&ack)
+	
+	if _, err := os.Stat("./_Downloads/" + pkt.Filename); !os.IsNotExist(err) {
+		err = os.Remove("./_Downloads/" + pkt.Filename)
+		if err != nil {
+			fmt.Println("couldn't remove file")
+			return
+		}
+	}
+
+	newPkt := GossipPacket{DataRequest: &DataRequest{
+		Origin:      g.Name,
+		Destination: dests[0],
+		HopLimit:    HOP_LIMIT,
+		HashValue:   tmp, //Check if correct with copy and everything
+	}}
+
+	g.sendDataPacket(newPkt)
+
+	downloadPrint(pkt.Filename, -2, dests[0])
+}
+
 func (g *Gossiper) requestFile(pkt *FileMessage) {
 
 	tmp, _ := hex.DecodeString(pkt.Request)

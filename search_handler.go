@@ -72,9 +72,6 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 				new_file = false
 				g.search_matches.sm[i].Matches[pkt.Origin] = searchResultIn.ChunkMap
 				matchComplete = g.checkMatchComplete(g.search_matches.sm[i].Matches,searchResultIn.ChunkCount)
-				
-				
-
 			}
 		}
 		if new_file {
@@ -87,6 +84,7 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 				Filename:     searchResultIn.FileName,
 				MetafileHash: metafileHash,
 				Matches:      matches,
+				ChunkCount:   searchResultIn.ChunkCount,
 			}
 			g.search_matches.m.Lock()
 			g.search_matches.sm = append(g.search_matches.sm, sm)
@@ -306,7 +304,7 @@ func read_files_for_search(matching_files []string) []*SearchResult {
 		file_size_rem := filesize
 
 		var chunck_counter uint64
-		chunck_counter = 0
+		chunck_counter = 1
 
 		//repeat read as long as there is data
 		for file_size_rem > 0 {

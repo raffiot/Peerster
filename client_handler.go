@@ -44,7 +44,7 @@ func (g *Gossiper) receiveMessageFromClient() {
 						g.loadFile(pkt.File.Filename)
 					} else {
 						if pkt.File.Destination == "" {
-
+							g.requestFileFromSearch(pkt.File)
 						} else {
 							g.requestFile(pkt.File)
 						}

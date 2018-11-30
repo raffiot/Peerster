@@ -190,6 +190,7 @@ type SearchMatch struct {
 	Filename     string
 	MetafileHash []byte
 	Matches      map[string][]uint64
+	ChunkCount   uint64
 }
 
 type SearchMatches struct {

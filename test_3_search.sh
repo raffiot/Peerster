@@ -48,6 +48,10 @@ sleep 5
 ./client/client -UIPort=12345 -keywords=rim -budget=0
 
 sleep 5
+
+./client/client -UIPort=12346 -file=new_test.txt -request=715b1934521a0215b180986cdd931782a8381c58c18a9e6e7f4bfd149afd4a61
+
+sleep 5
 pkill -f Peerster
 
 failed="F"
@@ -78,4 +82,20 @@ if [[ "$failed" == "T" ]] ; then
 	echo -e "${RED}***FAILED***${NC}"
 else
 	echo -e "${GREEN}***PASSED***${NC}"
+fi
+
+echo -e "${RED}###CHECK B DOWNLOAD test.txt from A${NC}"
+diff_res=$(diff _SharedFiles/test.txt _Downloads/new_test.txt)
+
+if [[ ! -f ./_Downloads/new_test.txt ]]; then
+	echo -e "${RED}***FAILED***${NC}"
+else
+    if [[ "$diff_res" != "" ]]; then
+        echo -e "${RED}***FAILED***${NC}"
+    else
+        echo -e "${GREEN}***PASSED***${NC}"
+    fi
+
+#    rm _Downloads/hamlet_F.txt
+#    rm _Downloads/.meta/hamlet_F.txt
 fi
