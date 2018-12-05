@@ -85,7 +85,7 @@ func (g *Gossiper) loadFile(filename string) {
 	fmt.Println(filesize)
 	fmt.Println(hex.EncodeToString(metafile))
 	fmt.Println(hex.EncodeToString(metahash))
-
+	g.newFileNotice(filename, filesize, metahash)
 	return
 }
 
@@ -214,7 +214,7 @@ func (g *Gossiper) requestFileFromSearch(pkt *FileMessage) {
 		ch:		chann,		
 	}
 
-	f := &File{
+	f := &FileForSearch{
 		Filename: pkt.Filename,
 		Filesize: 0,
 		Metafile: nil,
@@ -264,7 +264,7 @@ func (g *Gossiper) requestFile(pkt *FileMessage) {
 		ch:		chann,		
 	}
 
-	f := &File{
+	f := &FileForSearch{
 		Filename: pkt.Filename,
 		Filesize: 0,
 		Metafile: nil,
@@ -323,7 +323,7 @@ func writeFile(filename string, data []byte){
 func (g *Gossiper) receive_file_reply_for_me(pkt *DataReply) {
 	
 
-	var currentFile *File 
+	var currentFile *FileForSearch 
 	hash_received := hex.EncodeToString(pkt.HashValue)
 
 	var file_metahash string

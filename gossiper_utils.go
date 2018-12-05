@@ -20,6 +20,8 @@ type GossipPacket struct {
 	DataReply     *DataReply
 	SearchRequest *SearchRequest
 	SearchReply   *SearchReply
+	TxPublish 	  *TxPublish
+	BlockPublish  *BlockPublish
 }
 
 type ClientPacket struct {
@@ -60,6 +62,9 @@ type Gossiper struct {
 	search_req_timeout map[string]bool
 	search_matches     SearchMatches
 	pending_search     PendingSearches
+	blockchain		   Blockchain
+	pending_tx		   PendingTx
+	file_mapping	   FileMapping
 }
 
 type Rumor_state struct {
@@ -118,7 +123,7 @@ type PeerMessage struct {
 	msgs       map[uint32]*RumorMessage
 }
 
-type File struct {
+type FileForSearch struct {
 	Filename string
 	Filesize int
 	Metafile []byte
@@ -141,7 +146,7 @@ type DataRequest struct {
 }
 
 type PendingFiles struct{
-	pf	map[string]*File
+	pf	map[string]*FileForSearch
 	m 	sync.Mutex
 }
 
@@ -217,6 +222,43 @@ type DSDV struct{
 	m	sync.Mutex
 }
 
+type TxPublish struct {
+	File File
+	HopLimit uint32
+}
+
+type BlockPublish struct {
+	Block Block
+	HopLimit uint32
+}
+
+type File struct {
+	Name string
+	Size int64
+	MetafileHash []byte
+}
+
+type Block struct {
+	PrevHash [32]byte
+	Nonce [32]byte
+	Transactions []TxPublish
+}
+
+type Blockchain struct {
+	Blockchain []Block
+	m		   sync.Mutex
+}
+
+type PendingTx struct {
+	Pending		[]TxPublish
+	m			sync.Mutex
+}
+
+type FileMapping struct {
+	FileMapping		map[string][]byte
+	m				sync.Mutex
+}
+
 /**
 Constructor of Gossiper
 */
@@ -271,7 +313,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 	}
 
 	var mutex3 = sync.Mutex{}
-	var pending_file_tab = make(map[string]*File)
+	var pending_file_tab = make(map[string]*FileForSearch)
 	var pending_files = PendingFiles{
 		pf:	pending_file_tab,
 		m:	mutex3,
@@ -300,6 +342,27 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		m:	mutex8,
 	}
 
+	var tab_blockc []Block
+	var mutex9 = sync.Mutex{}
+	var blockchain = Blockchain{
+		Blockchain: tab_blockc,
+		m: mutex9,
+	}
+	
+	var ptx []TxPublish
+	var mutex10 = sync.Mutex{}
+	var pending_tx = PendingTx{
+		Pending: ptx,
+		m: mutex10,
+	}
+	
+	var filem = make(map[string][]byte)
+	var mutex11 = sync.Mutex{}
+	var file_mapping = FileMapping{
+		FileMapping: filem,
+		m: mutex11,
+	}
+	
 
 	return &Gossiper{
 		udp_address:        udpAddr,
@@ -318,6 +381,9 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		search_req_timeout: srt,
 		search_matches:     search_matches,
 		pending_search:     ps,
+		blockchain:			blockchain,
+		pending_tx:			pending_tx,
+		file_mapping:		file_mapping,
 	}
 }
 

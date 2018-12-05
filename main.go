@@ -17,6 +17,8 @@ var ANTI_ENTROPY_TIMER = 4 //Second
 var TIMEOUT_TIMER = 2      //Second
 var TIMEOUT_FILE = 5       //Second
 var HOP_LIMIT = uint32(10)
+var HOP_LIMIT_TX = uint32(10)
+var HOP_LIMIT_BLOCK = uint32(20)
 var me *Gossiper
 var mutex sync.Mutex
 
@@ -88,6 +90,10 @@ func (g *Gossiper) gossiper_handler() {
 					} else {
 						go g.fwd_search_reply(pkt.SearchReply)
 					}
+				} else if pkt.TxPublish != nil {
+					go g.tx_receive(pkt.TxPublish)
+				} else if pkt.BlockPublish != nil {
+					go g.block_receive(pkt.BlockPublish)				
 				} else {
 					fmt.Println("Error malformed gossip packet")
 				}
@@ -154,6 +160,9 @@ func main() {
 	go me.anti_entropy_handler()
 
 	go me.receiveMessageFromClient()
+	
+	go me.mine()
+	
 	if *server {
 		go me.gossiper_handler()
 		http.HandleFunc("/message", MessageHandler)
