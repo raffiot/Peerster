@@ -246,12 +246,12 @@ type Block struct {
 
 type Blockchain struct {
 	Blockchain []Block
-	m		   sync.Mutex
+	m		   sync.RWMutex
 }
 
 type PendingTx struct {
 	Pending		[]TxPublish
-	m			sync.Mutex
+	m			sync.RWMutex
 }
 
 type FileMapping struct {
@@ -343,14 +343,14 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 	}
 
 	var tab_blockc []Block
-	var mutex9 = sync.Mutex{}
+	var mutex9 = sync.RWMutex{}
 	var blockchain = Blockchain{
 		Blockchain: tab_blockc,
 		m: mutex9,
 	}
 	
 	var ptx []TxPublish
-	var mutex10 = sync.Mutex{}
+	var mutex10 = sync.RWMutex{}
 	var pending_tx = PendingTx{
 		Pending: ptx,
 		m: mutex10,
@@ -507,7 +507,7 @@ func printChain(blockchain []Block){
 	fmt.Print("CHAIN ")
 	for _,bl := range blockchain{
 		bl_hash := bl.Hash()
-		fmt.Print(string(bl_hash[:]) +":"+string(bl.PrevHash[:])+":")
+		fmt.Print(hex.EncodeToString(bl_hash[:]) +":"+hex.EncodeToString(bl.PrevHash[:])+":")
 		first := true
 		for _, tx := range bl.Transactions{
 			if first {
@@ -516,7 +516,7 @@ func printChain(blockchain []Block){
 				fmt.Print("," + tx.File.Name)
 			}	
 		}
-		fmt.Print(" ")
+		fmt.Println("")
 	}
 }
 

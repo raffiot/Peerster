@@ -15,14 +15,14 @@ import (
 func (g *Gossiper) tx_receive(pkt *TxPublish){
 	
 	already_seen := false
-	g.pending_tx.m.Lock()
+	g.pending_tx.m.RLock()
 	for _,tx := range g.pending_tx.Pending{
 		if tx.File.Name == pkt.File.Name {
 			already_seen = true
 			break
 		}
 	}
-	g.pending_tx.m.Unlock()
+	g.pending_tx.m.RUnlock()
 	
 	g.file_mapping.m.Lock()
 	_,ok := g.file_mapping.FileMapping[pkt.File.Name]
@@ -53,17 +53,19 @@ func (g *Gossiper) tx_receive(pkt *TxPublish){
 }
 
 func (g *Gossiper) block_receive(pkt *BlockPublish){
-
+	
 	valid_block := false
 	already_seen := false
 	hash_block_rcv := pkt.Block.Hash()
-	g.blockchain.m.Lock()
+	//fmt.Println("Receive block for " + hex.EncodeToString(hash_block_rcv[:]))
+	g.blockchain.m.RLock()
 	if len(g.blockchain.Blockchain) == 0 {
 		valid_block = true
 	} else {
 		for _,block := range g.blockchain.Blockchain{
 			hash_block := block.Hash()
 			if bytes.Equal(hash_block[:],pkt.Block.PrevHash[:]){
+				//fmt.Println("VALID BLOCK")
 				valid_block = true
 			}
 			if bytes.Equal(hash_block[:],hash_block_rcv[:]){
@@ -71,11 +73,13 @@ func (g *Gossiper) block_receive(pkt *BlockPublish){
 			}	
 		}
 	}
+	g.blockchain.m.RUnlock()
 	
-	valid_block = valid_block && (hash_block_rcv[0] == 0) && (hash_block_rcv[1] == 0)
+	empty_test := make([]byte,2)
+	valid_block = valid_block && bytes.Equal(hash_block_rcv[:2],empty_test)
 	
 	if !already_seen && valid_block{
-
+		//fmt.Println("VALID BLOCK2")
 		transaction_to_import := make([]TxPublish,len(pkt.Block.Transactions))
 		copy(transaction_to_import,pkt.Block.Transactions)
 		
@@ -103,16 +107,16 @@ func (g *Gossiper) block_receive(pkt *BlockPublish){
 func (g *Gossiper) mine(){
 	for true{
 		
-		g.pending_tx.m.Lock()
+		g.pending_tx.m.RLock()
 		pendings := make([]TxPublish,len(g.pending_tx.Pending))
 		copy(pendings,g.pending_tx.Pending) // Does it overconsume memory?? Or it is free at the end?
-		g.pending_tx.m.Unlock()
-		g.blockchain.m.Lock()
+		g.pending_tx.m.RUnlock()
+		g.blockchain.m.RLock()
 		var prevhash [32]byte
 		if len(g.blockchain.Blockchain) > 0 {
 			prevhash = g.blockchain.Blockchain[len(g.blockchain.Blockchain)-1].Hash()
 		}
-		g.blockchain.m.Unlock()
+		g.blockchain.m.RUnlock()
 		
 		var nonce [32]byte
 		rand.Read(nonce[:])
@@ -125,8 +129,8 @@ func (g *Gossiper) mine(){
 		}
 		
 		resHash := bl.Hash()
-		
-		if resHash[0] == 0 && resHash[1] == 0 {
+		empty_test := make([]byte,2)
+		if bytes.Equal(resHash[:2],empty_test) {
 		
 			printFoundBlock(hex.EncodeToString(resHash[:]))
 			
@@ -155,6 +159,7 @@ func (g *Gossiper) mine(){
 
 func (g * Gossiper) update_blockchain(bl Block, pendings []TxPublish){
 	
+	//fmt.Println("update_blockchain")
 	//No need to deep copy block as it will not be modified
 	//bl_copy := copyBlock(bl)
 	g.blockchain.m.Lock()
@@ -162,7 +167,7 @@ func (g * Gossiper) update_blockchain(bl Block, pendings []TxPublish){
 	copy_bc := make([]Block,len(g.blockchain.Blockchain))
 	copy(copy_bc,g.blockchain.Blockchain)
 	g.blockchain.m.Unlock()
-			
+	//fmt.Println("update_blockchain2")		
 	printChain(copy_bc)
 			
 	g.pending_tx.m.Lock()
@@ -175,15 +180,19 @@ func (g * Gossiper) update_blockchain(bl Block, pendings []TxPublish){
 				}
 			}
 		if !found {
+			//fmt.Println("NOT FOUND")
 			new_pendings = append(new_pendings,tx1)
 		}
 	}
 	g.pending_tx.Pending = new_pendings
 	g.pending_tx.m.Unlock()
-			
+
+	//fmt.Println("lengthhh "+string(len(new_pendings)))
+		
 	g.file_mapping.m.Lock()
 	for _, tx := range pendings{
 		g.file_mapping.FileMapping[tx.File.Name] = tx.File.MetafileHash
+		//fmt.Println(tx.File.Name +": "+hex.EncodeToString(tx.File.MetafileHash))
 	}
 	g.file_mapping.m.Unlock()
 
