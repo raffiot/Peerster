@@ -503,6 +503,27 @@ func searchPrint(filename string, origin string, metafile []byte, chunks []uint6
 
 }
 
+func printChain(blockchain []Block){
+	fmt.Print("CHAIN ")
+	for _,bl := range blockchain{
+		bl_hash := bl.Hash()
+		fmt.Print(string(bl_hash[:]) +":"+string(bl.PrevHash[:])+":")
+		first := true
+		for _, tx := range bl.Transactions{
+			if first {
+				fmt.Print(tx.File.Name)
+			} else {
+				fmt.Print("," + tx.File.Name)
+			}	
+		}
+		fmt.Print(" ")
+	}
+}
+
+func printFoundBlock(hash string){
+	fmt.Println("FOUND-BLOCK " + hash)
+}
+
 func arrayToString(a []uint64, delim string) string {
 	return strings.Trim(strings.Replace(fmt.Sprint(a), " ", delim, -1), "[]")
 	//return strings.Trim(strings.Join(strings.Split(fmt.Sprint(a), " "), delim), "[]")

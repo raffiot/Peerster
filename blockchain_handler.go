@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/binary"
+	"encoding/hex"
 	"github.com/dedis/protobuf"
 )
 
@@ -127,6 +128,8 @@ func (g *Gossiper) mine(){
 		
 		if resHash[0] == 0 && resHash[1] == 0 {
 		
+			printFoundBlock(hex.EncodeToString(resHash[:]))
+			
 			g.update_blockchain(bl,pendings)
 			
 			
@@ -156,7 +159,11 @@ func (g * Gossiper) update_blockchain(bl Block, pendings []TxPublish){
 	//bl_copy := copyBlock(bl)
 	g.blockchain.m.Lock()
 	g.blockchain.Blockchain = append(g.blockchain.Blockchain, bl)
+	copy_bc := make([]Block,len(g.blockchain.Blockchain))
+	copy(copy_bc,g.blockchain.Blockchain)
 	g.blockchain.m.Unlock()
+			
+	printChain(copy_bc)
 			
 	g.pending_tx.m.Lock()
 	var new_pendings []TxPublish
@@ -178,7 +185,10 @@ func (g * Gossiper) update_blockchain(bl Block, pendings []TxPublish){
 	for _, tx := range pendings{
 		g.file_mapping.FileMapping[tx.File.Name] = tx.File.MetafileHash
 	}
-	g.file_mapping.m.Unlock()	
+	g.file_mapping.m.Unlock()
+
+	
+	
 }
 
 func (g* Gossiper) newFileNotice(name string, size int, metafilehash []byte){
