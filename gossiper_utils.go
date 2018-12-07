@@ -244,9 +244,24 @@ type Block struct {
 	Transactions []TxPublish
 }
 
+/**
 type Blockchain struct {
 	Blockchain []Block
 	m		   sync.RWMutex
+}*/
+type Blockchain struct{
+	Longest	[]*BlockWithLink
+	All_c	map[string][]*BlockWithLink
+	All_b	map[string]*BlockWithLink
+	m		sync.RWMutex
+}
+
+
+
+type BlockWithLink struct{
+	bl Block
+	prev	*BlockWithLink
+	next	*BlockWithLink
 }
 
 type PendingTx struct {
@@ -256,7 +271,7 @@ type PendingTx struct {
 
 type FileMapping struct {
 	FileMapping		map[string][]byte
-	m				sync.Mutex
+	m				sync.RWMutex
 }
 
 /**
@@ -342,10 +357,21 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		m:	mutex8,
 	}
 
+	/**
 	var tab_blockc []Block
 	var mutex9 = sync.RWMutex{}
 	var blockchain = Blockchain{
 		Blockchain: tab_blockc,
+		m: mutex9,
+	}*/
+	var longest []*BlockWithLink
+	var all_c = make(map[string][]*BlockWithLink)
+	var all_b = make(map[string]*BlockWithLink)
+	var mutex9 = sync.RWMutex{}
+	var blockchain = Blockchain{
+		Longest: longest,
+		All_c: all_c,
+		All_b: all_b,
 		m: mutex9,
 	}
 	
@@ -357,7 +383,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 	}
 	
 	var filem = make(map[string][]byte)
-	var mutex11 = sync.Mutex{}
+	var mutex11 = sync.RWMutex{}
 	var file_mapping = FileMapping{
 		FileMapping: filem,
 		m: mutex11,
@@ -503,13 +529,14 @@ func searchPrint(filename string, origin string, metafile []byte, chunks []uint6
 
 }
 
-func printChain(blockchain []Block){
+func printChain(bl *BlockWithLink){
 	fmt.Print("CHAIN ")
-	for _,bl := range blockchain{
-		bl_hash := bl.Hash()
-		fmt.Print(hex.EncodeToString(bl_hash[:]) +":"+hex.EncodeToString(bl.PrevHash[:])+":")
+	node := bl
+	for node.prev != nil{
+		bl_hash := node.bl.Hash()
+		fmt.Print(hex.EncodeToString(bl_hash[:]) +":"+hex.EncodeToString(node.bl.PrevHash[:])+":")
 		first := true
-		for _, tx := range bl.Transactions{
+		for _, tx := range node.bl.Transactions{
 			if first {
 				fmt.Print(tx.File.Name)
 			} else {
@@ -517,7 +544,19 @@ func printChain(blockchain []Block){
 			}	
 		}
 		fmt.Println("")
+		node = node.prev
 	}
+	bl_hash := node.bl.Hash()
+	fmt.Print(hex.EncodeToString(bl_hash[:]) +":"+hex.EncodeToString(node.bl.PrevHash[:])+":")
+	first := true
+	for _, tx := range node.bl.Transactions{
+		if first {
+			fmt.Print(tx.File.Name)
+		} else {
+			fmt.Print("," + tx.File.Name)
+		}	
+	}
+	fmt.Println("")
 }
 
 func printFoundBlock(hash string){
@@ -528,4 +567,12 @@ func arrayToString(a []uint64, delim string) string {
 	return strings.Trim(strings.Replace(fmt.Sprint(a), " ", delim, -1), "[]")
 	//return strings.Trim(strings.Join(strings.Split(fmt.Sprint(a), " "), delim), "[]")
 	//return strings.Trim(strings.Join(strings.Fields(fmt.Sprint(a)), delim), "[]")
+}
+
+func printForkShorter(a [32]byte){
+	fmt.Println("FORK SHORTER "+hex.EncodeToString(a[:]))
+}
+
+func printForkLonkger(a int){
+	fmt.Println("FORK-LONGER rewind "+string(a)+" blocks")
 }
