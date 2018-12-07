@@ -1,5 +1,7 @@
 var private_msg = false;
 var private_id = "";
+var map_search
+var currentSearch = "";
 
 
 function send(type, msg) {
@@ -15,17 +17,27 @@ function send(type, msg) {
       type: "POST",
       url: "http://localhost:8080/"+type,
       data: d
-    })
-    .done(function(data) {
-      if (!(type === "node") ){
-        document.getElementById("message").value = '';
-      }
     });
+	if (!(type === "node") ){
+        document.getElementById("message").value = '';
+	}
   }
   get_message_and_nodes()
 }
 
+function sendSearch(msg){
 
+	currentSearch = msg
+	d = {filename:msg,request:""}
+	if (msg.length > 0) {
+		$.ajax({
+		  type: "POST",
+		  url: "http://localhost:8080/search",
+		  data: d
+		});
+		document.getElementById("search").value = '';
+	}
+}
 
 function appendPublic(){
 	var div = document.createElement("div");
@@ -64,7 +76,7 @@ function appendPeer(s){
 	div.setAttribute('class','peer_group');
 	div.id = "private_peer"
 	var b = document.createElement("b");
-	b.id = s;
+	b.id = s; 
 	b.onclick = privateDiscussion;
 	b.style.cursor =  "pointer";
 	b.style.margin =  "auto";
@@ -82,6 +94,7 @@ function appendPeer(s){
 	var span = document.createElement("span");
 	span.setAttribute('class', 'glyphicon glyphicon-file');
 	span.setAttribute('aria-hidden','true');
+	span.id = s; // don't know yet if necessary
 	button.appendChild(span);
 
 	div.appendChild(button);
@@ -90,6 +103,32 @@ function appendPeer(s){
 
 }
 
+function appendSearch(s){
+	var div = document.createElement("div");
+	div.setAttribute('class','peer_group');
+	div.id = "search_result";
+	var b = document.createElement("b");
+	b.id = s;
+	b.style.margin =  "auto";
+	b.appendChild(document.createTextNode(s));
+	div.appendChild(b);
+	
+	var button = document.createElement("button");
+	button.setAttribute('class','btn btn-default');
+	button.type = "submit";
+	button.id = s; // don't know yet if necessary
+	button.onclick=searchRequest; 
+	button.style.float = "right";
+	var span = document.createElement("span");
+	span.setAttribute('class', 'glyphicon glyphicon-file');
+	span.setAttribute('aria-hidden','true');
+	span.id = s;
+	button.appendChild(span);
+	
+	div.appendChild(button);
+	
+	document.querySelector("#search-box").appendChild(div);
+}
 
 
 
@@ -121,6 +160,21 @@ $(document).ready(function(){
 			send("message",txt);
 		}
   });
+  
+  $("button#sendSearch").click(function(e){
+		var txt = document.getElementById("search").value;
+		sendSearch(txt);
+  });
+  
+  $("#search").keydown(function(e) {
+    if (e.keyCode == 13) {
+		var txt = document.getElementById("search").value;
+		sendSearch(txt);
+    }
+  });
+  
+  map_search = new Map();
+  map_search.set("filename.txt","yoyo")//for test
 });
 
 $.ajax({
@@ -158,6 +212,17 @@ function privateDiscussion(event){
 	get_message_and_nodes();
 }
 
+function searchRequest(event){
+	var ID = event.target.id;
+	var metahash = map_search.get(ID)
+	console.log("here "+ID+" "+metahash);
+	$.ajax({
+		type: "POST",
+		url: "http://localhost:8080/search",
+		data: {filename:ID,request:metahash}
+	});
+}
+
 
 function fileRequest(event){
 	var ID = event.target.id;
@@ -179,7 +244,6 @@ function fileRequest(event){
 
 
 function fileup(){
-
 	var req = prompt("Please enter the name of the file you want to share:", "filename");
 	if (!(req == null || req == "")) {
 		$.ajax({
@@ -309,6 +373,22 @@ function get_message_and_nodes(){
 	  
     }
   });
+  if (currentSearch != ""){
+	  $.ajax({
+		type: "GET",
+		data: currentSearch,
+		url: "http://localhost:8080/search",
+		success: function(data,status,xhr){
+			var dataJSON = JSON.parse(data);
+			document.querySelector("#search-box").innerHTML = ""
+			for(filename in dataJSON){
+				var req = dataJSON[filename]
+				map_search.set(filename,req)
+				appendSearch(filename)
+			}
+		}
+	  });
+  }
 }
 
 function previewFile() {

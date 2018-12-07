@@ -171,6 +171,7 @@ func main() {
 		http.HandleFunc("/peer", PeerHandler)
 		http.HandleFunc("/private", PrivateMessageHandler)
 		http.HandleFunc("/file", FileMessageHandler)
+		http.HandleFunc("/search", SearchHandler)
 
 		if err := http.ListenAndServe("localhost:8080", nil); err != nil {
 			panic(err)
