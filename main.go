@@ -161,7 +161,7 @@ func main() {
 
 	go me.receiveMessageFromClient()
 	
-	//go me.mine()
+	go me.mine()
 	
 	if *server {
 		go me.gossiper_handler()

@@ -43,6 +43,7 @@ sleep 5
 
 pkill -f Peerster
 
+
 failed="T"
 echo -e "${RED}###CHECK FOUND-BLOCK IN AT LEAST ONE OF THE OUTPUT FILE${NC}"
 for i in `seq 0 5`;

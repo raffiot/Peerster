@@ -261,7 +261,7 @@ type Blockchain struct{
 type BlockWithLink struct{
 	bl Block
 	prev	*BlockWithLink
-	next	*BlockWithLink
+	next	[]*BlockWithLink
 }
 
 type PendingTx struct {
@@ -532,13 +532,14 @@ func searchPrint(filename string, origin string, metafile []byte, chunks []uint6
 func printChain(bl *BlockWithLink){
 	fmt.Print("CHAIN ")
 	node := bl
-	for node.prev != nil{
+	for node != nil{
 		bl_hash := node.bl.Hash()
 		fmt.Print(hex.EncodeToString(bl_hash[:]) +":"+hex.EncodeToString(node.bl.PrevHash[:])+":")
 		first := true
 		for _, tx := range node.bl.Transactions{
 			if first {
 				fmt.Print(tx.File.Name)
+				first = false
 			} else {
 				fmt.Print("," + tx.File.Name)
 			}	
@@ -546,17 +547,6 @@ func printChain(bl *BlockWithLink){
 		fmt.Println("")
 		node = node.prev
 	}
-	bl_hash := node.bl.Hash()
-	fmt.Print(hex.EncodeToString(bl_hash[:]) +":"+hex.EncodeToString(node.bl.PrevHash[:])+":")
-	first := true
-	for _, tx := range node.bl.Transactions{
-		if first {
-			fmt.Print(tx.File.Name)
-		} else {
-			fmt.Print("," + tx.File.Name)
-		}	
-	}
-	fmt.Println("")
 }
 
 func printFoundBlock(hash string){
@@ -573,6 +563,7 @@ func printForkShorter(a [32]byte){
 	fmt.Println("FORK SHORTER "+hex.EncodeToString(a[:]))
 }
 
-func printForkLonkger(a int){
-	fmt.Println("FORK-LONGER rewind "+string(a)+" blocks")
+func printForkLonger(a int){
+	str := fmt.Sprint(a)
+	fmt.Println("FORK-LONGER rewind "+str+" blocks")
 }

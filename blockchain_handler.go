@@ -128,7 +128,7 @@ func (g *Gossiper) mine(){
 		if bytes.Equal(resHash[:2],empty_test) {
 		
 			printFoundBlock(hex.EncodeToString(resHash[:]))
-			
+			fmt.Println(hex.EncodeToString(prevhash[:]))
 			g.update_blockchain(bl)
 			
 			
@@ -171,7 +171,10 @@ func (g * Gossiper) update_blockchain(bl Block){
 		
 		if bytes.Equal(bl.PrevHash[:],longest_hash[:]){	
 			//The block extend our longest chain
-			g.extendChain(g.blockchain.Longest,bl)		
+			lgn := g.extendChain(g.blockchain.Longest,bl)	
+			g.blockchain.m.Lock()
+			g.blockchain.Longest = lgn
+			g.blockchain.m.Unlock()	
 			g.updatePendings(bl.Transactions)		
 			g.updateFileMapping(bl.Transactions)
 			printChain(g.blockchain.Longest[len(g.blockchain.Longest)-1])
@@ -181,13 +184,13 @@ func (g * Gossiper) update_blockchain(bl Block){
 			g.blockchain.m.RUnlock()
 			if ok { //There exist a chain that we extend
 			
-				g.extendChain(tab,bl)			
+				tb := g.extendChain(tab,bl)			
 				
-				if len(tab) > len(g.blockchain.Longest) {
-					g.rollBack(tab)
+				if len(tb) > len(g.blockchain.Longest) {
+					g.rollBack(tb)
 					printChain(g.blockchain.Longest[len(g.blockchain.Longest)-1])
 				} else {
-					common_ancestor,_ := findCommonAncestor(g.blockchain.Longest[len(g.blockchain.Longest)-1],tab)
+					common_ancestor,_ := findCommonAncestor(g.blockchain.Longest[len(g.blockchain.Longest)-1],tb)
 					printForkShorter(common_ancestor.Hash())
 				}
 			} else { //We create our own chain
@@ -195,21 +198,21 @@ func (g * Gossiper) update_blockchain(bl Block){
 				prev, ok := g.blockchain.All_b[hash_prev_str]
 				g.blockchain.m.RUnlock()
 				if ok { //if we have a previous block
-				
+					
+
+					
+
 					new_chain := buildChainFromBlock(prev)
-		
-					prev_copy := &BlockWithLink{
-						bl: prev.bl,
-						prev: prev.prev,
-					}
-					new_chain = append(new_chain,prev_copy)
+
 					
 					new_bl := &BlockWithLink{
 						bl:bl,
-						prev: prev_copy,
+						prev: prev,
 					}
-					prev_copy.next = new_bl
+
+					prev.next = append(prev.next,new_bl)
 					new_chain = append(new_chain,new_bl)
+
 					g.blockchain.m.Lock()
 					g.blockchain.All_b[hash_bl_str] = new_bl
 					g.blockchain.All_c[hash_bl_str] = new_chain
@@ -250,9 +253,13 @@ func (g *Gossiper) rollBack(new_longest []*BlockWithLink){
 		fmt.Println("Error, no common ancestor")
 		return
 	}
-	printForkLonkger(counter)
+	printForkLonger(counter)
 	
 	g.rollback_fileMapping(longest_node,new_longest[len(new_longest)-1] ,common_ancestor)
+
+	g.blockchain.m.Lock()
+	g.blockchain.Longest = new_longest
+	g.blockchain.m.Unlock()
 
 	//Find common ancestor
 	//Undo FileMapping until common ancestor
@@ -319,7 +326,7 @@ func findCommonAncestor(longest_node *BlockWithLink,new_longest []*BlockWithLink
 	return nil,counter
 }
 
-func (g *Gossiper) extendChain(tab []*BlockWithLink, block Block){
+func (g *Gossiper) extendChain(tab []*BlockWithLink, block Block) ([]*BlockWithLink){
 
 				
 	prev := tab[len(tab)-1]
@@ -331,14 +338,16 @@ func (g *Gossiper) extendChain(tab []*BlockWithLink, block Block){
 		bl: block,
 		prev: prev,
 	}
-	
-	prev.next = blockL
+	var next_array []*BlockWithLink
+	next_array = append(next_array,blockL)
+	prev.next = next_array
 	
 	
 	
 	g.blockchain.m.Lock()
 	
 	tab = append(tab, blockL)
+	fmt.Println("Here")
 	g.blockchain.All_b[hash_bl_str] = blockL
 	_,ok := g.blockchain.All_c[hash_prev_str]
 	if ok{
@@ -346,24 +355,28 @@ func (g *Gossiper) extendChain(tab []*BlockWithLink, block Block){
 		g.blockchain.All_c[hash_bl_str] = tab
 	}
 	g.blockchain.m.Unlock()
+	return tab 
 }
 
 func buildChainFromBlock(block *BlockWithLink) ([]*BlockWithLink) {
-	block_hash := block.bl.Hash()
+	var new_chain []*BlockWithLink
 	var first = block
 
-	for first.prev != nil{
+	for first != nil{
+		new_chain = append([]*BlockWithLink{first},new_chain...)
 		first = first.prev
 	}
-	
-
-	var new_chain []*BlockWithLink
-	var first_hash = first.bl.Hash()
-	for !bytes.Equal(first_hash[:],block_hash[:]){
-		new_chain = append(new_chain, first)
-		first = first.next
-		first_hash = first.bl.Hash()
+	/*fmt.Println("------------------------------------")
+	copy_ := first
+	fmt.Println(hex.EncodeToString(block_hash[:]))
+	for copy_ !=nil {
+		h := copy_.bl.Hash()
+		str1 := hex.EncodeToString(h[:])
+		str2 := hex.EncodeToString(copy_.bl.PrevHash[:])
+		fmt.Println( str1 +" : "+ str2)
+		copy_ = copy_.next
 	}
+	fmt.Println("------------------------------------")	*/
 
 	//THE CHAIN DOESN'T CONTAIN block BECAUSE WE WANT A COPY of it
 	
