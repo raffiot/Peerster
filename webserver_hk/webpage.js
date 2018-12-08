@@ -28,6 +28,7 @@ function send(type, msg) {
 function sendSearch(msg){
 
 	currentSearch = msg
+	console.log("send search "+ msg)
 	d = {filename:msg,request:""}
 	if (msg.length > 0) {
 		$.ajax({

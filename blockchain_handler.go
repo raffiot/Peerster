@@ -10,6 +10,7 @@ import (
 	"encoding/binary"
 	"encoding/hex"
 	"github.com/dedis/protobuf"
+	"time"
 )
 
 func (g *Gossiper) tx_receive(pkt *TxPublish){
@@ -59,7 +60,7 @@ func (g *Gossiper) block_receive(pkt *BlockPublish){
 	//Check if PoW correct --> valid
 
 	empty_test_2 := make([]byte,2)
-	empty_test_32 := make([]byte,32)
+	//empty_test_32 := make([]byte,32)
 	
 	hash_block_rcv := pkt.Block.Hash()
 	hash_prev_rcv := pkt.Block.PrevHash
@@ -72,7 +73,8 @@ func (g *Gossiper) block_receive(pkt *BlockPublish){
 	g.blockchain.m.RUnlock()
 	
 	
-	have_prev = have_prev || (bytes.Equal(hash_prev_rcv[:],empty_test_32) && len(g.blockchain.Longest) ==0)
+	//have_prev = have_prev || (bytes.Equal(hash_prev_rcv[:],empty_test_32) && len(g.blockchain.Longest) ==0)
+	have_prev = have_prev || len(g.blockchain.Longest) ==0
 	valid_block := bytes.Equal(hash_block_rcv[:2],empty_test_2)
 	
 	if !already_seen && valid_block && have_prev{
@@ -86,6 +88,13 @@ func (g *Gossiper) block_receive(pkt *BlockPublish){
 		if newpkt.BlockPublish.HopLimit > 0 {
 			g.broadcastBlockchain(newpkt)
 		}
+	} else if !already_seen && valid_block {
+		//HAPPEN TO LONELY BLOCK 
+		//because block has no prev found
+		g.lonely_blocks.m.Lock()
+		g.lonely_blocks.lonelys[hash_prev_rcv_str] = &(pkt.Block)
+		g.lonely_blocks.m.Unlock()
+				
 	}
 	
 	//Check HashPrev in == block hash in blockchain (if blockchain empty, accept)
@@ -99,6 +108,7 @@ func (g *Gossiper) block_receive(pkt *BlockPublish){
 
 
 func (g *Gossiper) mine(){
+	first := true
 	for true{
 		
 		g.pending_tx.m.RLock()
@@ -126,7 +136,11 @@ func (g *Gossiper) mine(){
 		resHash := bl.Hash()
 		empty_test := make([]byte,2)
 		if bytes.Equal(resHash[:2],empty_test) {
-		
+			if first {
+				time.Sleep(time.Duration(SLEEP_FIRST_BLOCK) * time.Second)
+				first = false
+			}
+			
 			printFoundBlock(hex.EncodeToString(resHash[:]))
 			fmt.Println(hex.EncodeToString(prevhash[:]))
 			g.update_blockchain(bl)
@@ -171,7 +185,9 @@ func (g * Gossiper) update_blockchain(bl Block){
 		
 		if bytes.Equal(bl.PrevHash[:],longest_hash[:]){	
 			//The block extend our longest chain
-			lgn := g.extendChain(g.blockchain.Longest,bl)	
+			lgn := g.extendChain(g.blockchain.Longest,bl)
+			lgn = g.happen_lonelys(lgn)
+			//CHECK IF I CAN HAPPEN A LONELY BLOCK
 			g.blockchain.m.Lock()
 			g.blockchain.Longest = lgn
 			g.blockchain.m.Unlock()	
@@ -184,8 +200,9 @@ func (g * Gossiper) update_blockchain(bl Block){
 			g.blockchain.m.RUnlock()
 			if ok { //There exist a chain that we extend
 			
-				tb := g.extendChain(tab,bl)			
-				
+				tb := g.extendChain(tab,bl)
+				tb = g.happen_lonelys(tb)
+				//CHECK IF I CAN HAPPEN A LONELY BLOCK
 				if len(tb) > len(g.blockchain.Longest) {
 					g.rollBack(tb)
 					printChain(g.blockchain.Longest[len(g.blockchain.Longest)-1])
@@ -203,7 +220,8 @@ func (g * Gossiper) update_blockchain(bl Block){
 					
 
 					new_chain := buildChainFromBlock(prev)
-
+					new_chain = g.happen_lonelys(new_chain)
+					//CHECK IF I CAN HAPPEN A LONELY BLOCK
 					
 					new_bl := &BlockWithLink{
 						bl:bl,
@@ -226,6 +244,7 @@ func (g * Gossiper) update_blockchain(bl Block){
 					}
 					
 				}
+				
 			}
 		}
 	} else {
@@ -240,6 +259,27 @@ func (g * Gossiper) update_blockchain(bl Block){
 		
 	}
 	
+}
+
+func (g *Gossiper) happen_lonelys(chain []*BlockWithLink)([]*BlockWithLink){
+	latest := chain[len(chain)-1]
+	latest_hash := latest.bl.Hash()
+	latest_hash_str := hex.EncodeToString(latest_hash[:])
+	g.lonely_blocks.m.Lock()
+	elem,ok := g.lonely_blocks.lonelys[latest_hash_str]
+	if ok {
+		var next_array []*BlockWithLink
+		blockL := &BlockWithLink{
+				bl: *elem,
+				prev: latest,
+		}
+		next_array = append(next_array,blockL)
+		latest.next = next_array
+		chain = append(chain,blockL)
+		delete(g.lonely_blocks.lonelys,latest_hash_str)
+	}
+	g.lonely_blocks.m.Unlock()
+	return chain
 }
 
 func (g *Gossiper) rollBack(new_longest []*BlockWithLink){
@@ -366,17 +406,6 @@ func buildChainFromBlock(block *BlockWithLink) ([]*BlockWithLink) {
 		new_chain = append([]*BlockWithLink{first},new_chain...)
 		first = first.prev
 	}
-	/*fmt.Println("------------------------------------")
-	copy_ := first
-	fmt.Println(hex.EncodeToString(block_hash[:]))
-	for copy_ !=nil {
-		h := copy_.bl.Hash()
-		str1 := hex.EncodeToString(h[:])
-		str2 := hex.EncodeToString(copy_.bl.PrevHash[:])
-		fmt.Println( str1 +" : "+ str2)
-		copy_ = copy_.next
-	}
-	fmt.Println("------------------------------------")	*/
 
 	//THE CHAIN DOESN'T CONTAIN block BECAUSE WE WANT A COPY of it
 	

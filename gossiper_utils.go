@@ -65,6 +65,7 @@ type Gossiper struct {
 	blockchain		   Blockchain
 	pending_tx		   PendingTx
 	file_mapping	   FileMapping
+	lonely_blocks	   LonelyBlocks
 }
 
 type Rumor_state struct {
@@ -274,6 +275,11 @@ type FileMapping struct {
 	m				sync.RWMutex
 }
 
+type LonelyBlocks struct {
+	lonelys			map[string]*Block
+	m				sync.RWMutex
+}
+
 /**
 Constructor of Gossiper
 */
@@ -389,6 +395,12 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		m: mutex11,
 	}
 	
+	var lonelys	 = make(map[string]*Block)
+	var mutex12 = sync.RWMutex{}
+	var lonely_blocks = LonelyBlocks{
+		lonelys: lonelys	,
+		m: mutex12,
+	}
 
 	return &Gossiper{
 		udp_address:        udpAddr,
@@ -410,6 +422,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		blockchain:			blockchain,
 		pending_tx:			pending_tx,
 		file_mapping:		file_mapping,
+		lonely_blocks:		lonely_blocks,
 	}
 }
 

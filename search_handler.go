@@ -56,7 +56,6 @@ func (g *Gossiper) checkMatchComplete(matches map[string][]uint64, chunkCount ui
 
 
 func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
-	fmt.Println("search_reply_for_me")
 	g.search_matches.m.Lock()
 	sm_copy := make([]SearchMatch, len(g.search_matches.sm))
 	copy(sm_copy,g.search_matches.sm)
@@ -71,14 +70,17 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 	for _, searchResultIn := range pkt.Results {
 		new_file := true
 		matchComplete := false
-		//fmt.Println("I'm heere")
+
 		searchPrint(searchResultIn.FileName,pkt.Origin, searchResultIn.MetafileHash, searchResultIn.ChunkMap)
 		
 		for i, match := range sm_copy {
 			if bytes.Equal(match.MetafileHash, searchResultIn.MetafileHash) {
 				new_file = false
+				alreadyComplete := g.checkMatchComplete(g.search_matches.sm[i].Matches,searchResultIn.ChunkCount)
 				g.search_matches.sm[i].Matches[pkt.Origin] = searchResultIn.ChunkMap
-				matchComplete = g.checkMatchComplete(g.search_matches.sm[i].Matches,searchResultIn.ChunkCount)
+				if !alreadyComplete {
+					matchComplete = g.checkMatchComplete(g.search_matches.sm[i].Matches,searchResultIn.ChunkCount)
+				}
 			}
 		}
 		if new_file {
@@ -99,7 +101,6 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 			matchComplete = g.checkMatchComplete(sm.Matches,searchResultIn.ChunkCount)
 		}
 		
-		fmt.Println(matchComplete)
 		if matchComplete {
 
 			var pending_search *PendingSearch
@@ -143,15 +144,12 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 }
 
 func (g *Gossiper) receive_search_request(pkt *SearchRequest) {
-	fmt.Println("receive search request")
-	fmt.Println(pkt)
 	var already_received bool
 
 	search_id := pkt.Origin
 	for _, elem := range pkt.Keywords {
 		search_id += elem
 	}
-	fmt.Println(search_id)
 	bytes:= []byte(search_id)
 
 	sha_256 := sha256.New()
@@ -178,10 +176,6 @@ func (g *Gossiper) receive_search_request(pkt *SearchRequest) {
 			sr := read_files_for_search(matching_files)
 
 			if len(sr) > 0 {
-				fmt.Println("found something")
-				fmt.Println(sr[0])
-				//fmt.Println(sr[1])
-				fmt.Println(pkt.Origin)
 				newPkt := GossipPacket{SearchReply: &SearchReply{
 					Origin:      g.Name,
 					Destination: pkt.Origin,
@@ -242,11 +236,12 @@ func (g *Gossiper) search_routine(pkt *SearchRequest, ch chan bool) {
 		case _ = <-ch:
 			finish = true
 		case <-time.After(1 * time.Second):
-			fmt.Println("Budget " + string(budget))
+			str := fmt.Sprint(budget)
+			fmt.Println("Budget " + str)
 			budget *= 2
 			pkt.Budget = uint64(budget)
 			g.propagate_search(pkt)
-			if budget >= 32 {
+			if budget > 32 {
 				finish = true
 			}
 
@@ -289,7 +284,6 @@ func find_matching_files(keywords []string) []string {
 		for _, k := range keywords {
 			re := regexp.MustCompile(".*" + k + ".*")
 			if re.MatchString(f.Name()) {
-				fmt.Println(f.Name())
 				ok := contains(matching_files, f.Name())
 
 				if !ok {
@@ -298,7 +292,6 @@ func find_matching_files(keywords []string) []string {
 			}
 		}
 	}
-	fmt.Println(matching_files)
 	return matching_files
 }
 
@@ -306,11 +299,10 @@ func read_files_for_search(matching_files []string) []*SearchResult {
 	var sr []*SearchResult
 
 	for _, k := range matching_files {
-		fmt.Println(k)
 		var chunks []uint64
 		var metafile []byte
 
-		r, err := os.Open("./_SharedFiles/" + k)
+		r, err := os.Open("./_SharedFiles/" + k) // MAYBE ALSO CHECK IN DOWNLOAD
 		if err != nil {
 			fmt.Printf("error opening file: %v\n", err)
 			os.Exit(1)

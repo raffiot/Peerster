@@ -24,13 +24,14 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		for k := range r.URL.Query() {
 			req = k
 		}
+
 		keywords_tab := strings.Split(req, ",")
 		
-		var values map[string]string
+		var values = make(map[string]string)
 		for _,elem := range search_m{
 			for _,k := range keywords_tab {
 				re := regexp.MustCompile(".*" + k + ".*")
-				if re.MatchString(elem.Filenamee) {
+				if re.MatchString(elem.Filename) {
 					values[elem.Filename] = hex.EncodeToString(elem.MetafileHash)
 				}
 			}		
@@ -48,11 +49,11 @@ func SearchHandler(w http.ResponseWriter, r *http.Request) {
 		
 		filename := r.Form.Get("filename")
 		req := r.Form.Get("request")
-		
+		fmt.Println("POST REQ "+filename)
 		var pkt_to_enc ClientPacket
 		
 		if req == "" {
-			keywords_tab := strings.Split(req, ",")
+			keywords_tab := strings.Split(filename, ",")
 			pkt_to_enc = ClientPacket{Search: &SearchRequest{
 				Origin:	"",
 				Budget: uint64(0),

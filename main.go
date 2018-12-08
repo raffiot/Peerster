@@ -13,9 +13,10 @@ import (
 )
 
 var UDP_PACKET_SIZE = 2048
-var ANTI_ENTROPY_TIMER = 4 //Second
+var ANTI_ENTROPY_TIMER = 10 //Second
 var TIMEOUT_TIMER = 2      //Second
 var TIMEOUT_FILE = 5       //Second
+var SLEEP_FIRST_BLOCK = 5
 var HOP_LIMIT = uint32(10)
 var HOP_LIMIT_TX = uint32(10)
 var HOP_LIMIT_BLOCK = uint32(20)
@@ -161,7 +162,7 @@ func main() {
 
 	go me.receiveMessageFromClient()
 	
-	go me.mine()
+	//go me.mine()
 	
 	if *server {
 		go me.gossiper_handler()
