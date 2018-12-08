@@ -99,3 +99,21 @@ else
 #    rm _Downloads/hamlet_F.txt
 #    rm _Downloads/.meta/hamlet_F.txt
 fi
+
+failed="F"
+echo -e "${RED}###CHECK NO CHUNK WITH INDEX 0${NC}"
+for i in `seq 0 5`;
+do
+	echo -e "${outputFiles[$i]}"
+    if (grep -q "chunks=0" "${outputFiles[$i]}") ; then
+        failed="T"
+    fi
+done
+
+if [[ "$failed" == "T" ]] ; then
+	echo -e "${RED}***FAILED***${NC}"
+else
+	echo -e "${GREEN}***PASSED***${NC}"
+fi
+
+

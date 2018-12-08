@@ -14,25 +14,22 @@ import (
 )
 
 func (g *Gossiper) tx_receive(pkt *TxPublish){
-	
+	fmt.Println("tx_receive "+pkt.File.Name)
 	already_seen := false
-	g.pending_tx.m.RLock()
-	for _,tx := range g.pending_tx.Pending{
+	g.blockchain.m.Lock()
+	for _,tx := range g.blockchain.Pending{
 		if tx.File.Name == pkt.File.Name {
 			already_seen = true
 			break
 		}
 	}
-	g.pending_tx.m.RUnlock()
-	
-	g.file_mapping.m.RLock()
-	_,ok := g.file_mapping.FileMapping[pkt.File.Name]
-	g.file_mapping.m.RUnlock()
+	_,ok := g.blockchain.FileMapping[pkt.File.Name]
+	if !already_seen && !ok {
+		g.blockchain.Pending = append(g.blockchain.Pending,*pkt)
+	}
+	g.blockchain.m.Unlock()
 	
 	if !already_seen && !ok {
-		g.pending_tx.m.Lock()
-		g.pending_tx.Pending = append(g.pending_tx.Pending,*pkt)
-		g.pending_tx.m.Unlock()
 		
 		newPkt := &GossipPacket{TxPublish: &TxPublish{
 			File: pkt.File,
@@ -40,6 +37,7 @@ func (g *Gossiper) tx_receive(pkt *TxPublish){
 		}}
 		
 		if newPkt.TxPublish.HopLimit > 0 {
+			
 			g.broadcastBlockchain(newPkt)
 		}
 	}
@@ -111,10 +109,10 @@ func (g *Gossiper) mine(){
 	first := true
 	for true{
 		
-		g.pending_tx.m.RLock()
-		pendings := make([]TxPublish,len(g.pending_tx.Pending))
-		copy(pendings,g.pending_tx.Pending) // Does it overconsume memory?? Or it is free at the end?
-		g.pending_tx.m.RUnlock()
+		g.blockchain.m.RLock()
+		pendings := make([]TxPublish,len(g.blockchain.Pending))
+		copy(pendings,g.blockchain.Pending) // Does it overconsume memory?? Or it is free at the end?
+		g.blockchain.m.RUnlock()
 		
 		g.blockchain.m.RLock()
 		var prevhash [32]byte
@@ -136,6 +134,7 @@ func (g *Gossiper) mine(){
 		resHash := bl.Hash()
 		empty_test := make([]byte,2)
 		if bytes.Equal(resHash[:2],empty_test) {
+			
 			if first {
 				time.Sleep(time.Duration(SLEEP_FIRST_BLOCK) * time.Second)
 				first = false
@@ -187,13 +186,24 @@ func (g * Gossiper) update_blockchain(bl Block){
 			//The block extend our longest chain
 			lgn := g.extendChain(g.blockchain.Longest,bl)
 			lgn = g.happen_lonelys(lgn)
+			//lgn_tx := get_transactions(lgn)
 			//CHECK IF I CAN HAPPEN A LONELY BLOCK
 			g.blockchain.m.Lock()
-			g.blockchain.Longest = lgn
+			//VERIFIY DUPLICATE BEFORE UPDATE
+			//block_ok := g.blockNoDuplicate(lgn_tx)
+			block_ok := g.blockNoDuplicate(bl.Transactions) //I have to also check lonely if it have been append
+			if block_ok {
+				g.blockchain.Longest = lgn
+				g.updatePendings(bl.Transactions)
+				g.updateFileMapping(bl.Transactions)
+			}
 			g.blockchain.m.Unlock()	
-			g.updatePendings(bl.Transactions)		
-			g.updateFileMapping(bl.Transactions)
-			printChain(g.blockchain.Longest[len(g.blockchain.Longest)-1])
+					
+			
+			fmt.Println("extend longest")
+			if block_ok {
+				printChain(g.blockchain.Longest[len(g.blockchain.Longest)-1])
+			}
 		} else{
 			g.blockchain.m.RLock()
 			tab,ok := g.blockchain.All_c[hash_prev_str] //Does it return real chain pointer
@@ -202,10 +212,11 @@ func (g * Gossiper) update_blockchain(bl Block){
 			
 				tb := g.extendChain(tab,bl)
 				tb = g.happen_lonelys(tb)
+				fmt.Println("extend existing chain")
 				//CHECK IF I CAN HAPPEN A LONELY BLOCK
 				if len(tb) > len(g.blockchain.Longest) {
 					g.rollBack(tb)
-					printChain(g.blockchain.Longest[len(g.blockchain.Longest)-1])
+					
 				} else {
 					common_ancestor,_ := findCommonAncestor(g.blockchain.Longest[len(g.blockchain.Longest)-1],tb)
 					printForkShorter(common_ancestor.Hash())
@@ -217,7 +228,7 @@ func (g * Gossiper) update_blockchain(bl Block){
 				if ok { //if we have a previous block
 					
 
-					
+					fmt.Println("extend new chain")
 
 					new_chain := buildChainFromBlock(prev)
 					new_chain = g.happen_lonelys(new_chain)
@@ -237,7 +248,6 @@ func (g * Gossiper) update_blockchain(bl Block){
 					g.blockchain.m.Unlock()
 					if len(new_chain) > len(g.blockchain.Longest) {
 						g.rollBack(new_chain)
-						printChain(g.blockchain.Longest[len(g.blockchain.Longest)-1])
 					} else {
 						common_ancestor,_ := findCommonAncestor(g.blockchain.Longest[len(g.blockchain.Longest)-1],new_chain)
 						printForkShorter(common_ancestor.Hash())
@@ -248,17 +258,40 @@ func (g * Gossiper) update_blockchain(bl Block){
 			}
 		}
 	} else {
+		fmt.Println("create new longest")
 		var new_chain []*BlockWithLink
 		new_bl_ln := &BlockWithLink{bl:bl}
 		new_chain = append(new_chain,new_bl_ln)
 		g.blockchain.m.Lock()
+		// ITS FIRST CHAIN SO NO CHECK FOR DUPLICATE
 		g.blockchain.All_b[hash_bl_str] = new_bl_ln
 		g.blockchain.All_c[hash_bl_str] = new_chain
 		g.blockchain.Longest = new_chain
+		g.updatePendings(bl.Transactions)
+		g.updateFileMapping(bl.Transactions)	
 		g.blockchain.m.Unlock()
 		
 	}
 	
+}
+
+func get_transactions(chain []*BlockWithLink) ([]TxPublish){
+	var array []TxPublish
+	for _,c := range chain{
+		for _,tx_pub := range c.bl.Transactions{
+			array = append(array,tx_pub)
+		}
+	}
+	return array
+}
+
+func (g *Gossiper) blockNoDuplicate(tx []TxPublish) (bool){
+	no_duplicate := true
+	for _,elem := range tx {
+		_,ok := g.blockchain.FileMapping[elem.File.Name]
+		no_duplicate = no_duplicate && !ok 
+	}
+	return no_duplicate
 }
 
 func (g *Gossiper) happen_lonelys(chain []*BlockWithLink)([]*BlockWithLink){
@@ -282,8 +315,47 @@ func (g *Gossiper) happen_lonelys(chain []*BlockWithLink)([]*BlockWithLink){
 	return chain
 }
 
+func compare_tx(old_longest []*BlockWithLink, new_longest []*BlockWithLink) (ensemble_a []TxPublish, ensemble_b []TxPublish){
+
+	var old_tx []TxPublish
+	var new_tx []TxPublish
+
+	for _,bl1 := range old_longest{
+		old_tx = append(old_tx,bl1.bl.Transactions...)
+	}
+	for _,bl2 := range new_longest{
+		new_tx = append(new_tx,bl2.bl.Transactions...)
+	}
+
+	for _,tx1 := range old_tx {
+		not_found := true
+		for _,tx2 := range new_tx {
+			if tx1.File.Name == tx2.File.Name {
+				not_found = false
+			}
+		}
+		if not_found {
+			ensemble_a = append(ensemble_a,tx1)
+		}
+	}
+
+	for _,tx2 := range new_tx {
+		not_found := true
+		for _,tx1 := range old_tx {
+			if tx1.File.Name == tx2.File.Name {
+				not_found = false
+			}
+		}
+		if not_found {
+			ensemble_b = append(ensemble_a,tx2)
+		}
+	}
+	return
+}
+
 func (g *Gossiper) rollBack(new_longest []*BlockWithLink){
-	
+	//printChain(g.blockchain.Longest[len(g.blockchain.Longest)-1])
+
 	g.blockchain.m.RLock()
 	longest_node := g.blockchain.Longest[len(g.blockchain.Longest) - 1]
 	g.blockchain.m.RUnlock()
@@ -294,59 +366,34 @@ func (g *Gossiper) rollBack(new_longest []*BlockWithLink){
 		return
 	}
 	printForkLonger(counter)
+
+	//VERIFIY DUPLICATE BEFORE UPDATE
 	
-	g.rollback_fileMapping(longest_node,new_longest[len(new_longest)-1] ,common_ancestor)
 
 	g.blockchain.m.Lock()
-	g.blockchain.Longest = new_longest
+	ensemble_a, ensemble_b := compare_tx(g.blockchain.Longest,new_longest)
+	chain_ok := g.blockNoDuplicate(ensemble_b)
+	if chain_ok {
+		g.blockchain.Longest = new_longest
+
+		for _,tx := range ensemble_a {
+			delete(g.blockchain.FileMapping,tx.File.Name)	
+			g.blockchain.Pending = append(g.blockchain.Pending, tx) 		
+		}
+		for _,tx := range ensemble_b {
+			g.blockchain.FileMapping[tx.File.Name] = tx.File.MetafileHash
+		}
+	}
 	g.blockchain.m.Unlock()
+	if chain_ok {
+		printChain(g.blockchain.Longest[len(g.blockchain.Longest)-1])
+	}
 
 	//Find common ancestor
 	//Undo FileMapping until common ancestor
 	//Go up on chain and sum up Transactions
 	//call updatePendings with this list
 	//call update_fileMapping with this list
-}
-
-func (g *Gossiper) rollback_fileMapping(old_chain *BlockWithLink, new_chain *BlockWithLink, common_ancestor *Block){
-	
-
-	current_node := old_chain
-	current_hash := old_chain.bl.Hash()
-	ancestor_hash := common_ancestor.Hash()
-	finish := false
-	g.file_mapping.m.Lock()
-	for !bytes.Equal(current_hash[:],ancestor_hash[:]) && !finish {
-		for _,tx := range current_node.bl.Transactions{
-			delete(g.file_mapping.FileMapping,tx.File.Name)
-		}
-		if current_node.prev != nil {
-			current_node = current_node.prev
-		} else {
-			finish = true
-		}
-	}
-	g.file_mapping.m.Unlock()
-	
-	current_node = new_chain
-	current_hash = new_chain.bl.Hash()
-	finish = false
-	var pendings []TxPublish
-	
-	g.file_mapping.m.Lock()
-	for !bytes.Equal(current_hash[:],ancestor_hash[:]) && !finish {
-		for _,tx := range current_node.bl.Transactions{
-			g.file_mapping.FileMapping[tx.File.Name] = tx.File.MetafileHash
-			pendings = append(pendings,tx)
-		}
-		if current_node.prev != nil {
-			current_node = current_node.prev
-		} else {
-			finish = true
-		}
-	}
-	g.file_mapping.m.Unlock()
-	g.updatePendings(pendings)
 }
 
 func findCommonAncestor(longest_node *BlockWithLink,new_longest []*BlockWithLink) (*Block,int){
@@ -413,9 +460,8 @@ func buildChainFromBlock(block *BlockWithLink) ([]*BlockWithLink) {
 }
 
 func (g *Gossiper) updatePendings(pendings []TxPublish){
-	g.pending_tx.m.Lock()
 	var new_pendings []TxPublish
-	for _,tx1 := range g.pending_tx.Pending {
+	for _,tx1 := range g.blockchain.Pending {
 		found := false
 			for _, tx2 := range pendings {
 				if tx1.File.Name == tx2.File.Name{
@@ -427,16 +473,13 @@ func (g *Gossiper) updatePendings(pendings []TxPublish){
 			new_pendings = append(new_pendings,tx1)
 		}
 	}
-	g.pending_tx.Pending = new_pendings
-	g.pending_tx.m.Unlock()
+	g.blockchain.Pending = new_pendings
 }
 
 func (g *Gossiper) updateFileMapping(pendings []TxPublish){
-	g.file_mapping.m.Lock()
 	for _, tx := range pendings{
-		g.file_mapping.FileMapping[tx.File.Name] = tx.File.MetafileHash
+		g.blockchain.FileMapping[tx.File.Name] = tx.File.MetafileHash
 	}
-	g.file_mapping.m.Unlock()
 }
 
 func (g* Gossiper) newFileNotice(name string, size int, metafilehash []byte){
@@ -457,17 +500,17 @@ func (g* Gossiper) newFileNotice(name string, size int, metafilehash []byte){
 	
 	
 	already_seen := false
-	g.pending_tx.m.Lock()
-	for _,tx := range g.pending_tx.Pending{
+	g.blockchain.m.Lock()
+	for _,tx := range g.blockchain.Pending{
 		if tx.File.Name == txpb.File.Name {
 			already_seen = true
 			break
 		}
 	}
 	if !already_seen {
-		g.pending_tx.Pending = append(g.pending_tx.Pending, txpb)
+		g.blockchain.Pending = append(g.blockchain.Pending, txpb)
 	}
-	g.pending_tx.m.Unlock()
+	g.blockchain.m.Unlock()
 	
 	gp := &GossipPacket{TxPublish : &txpb}
 	g.broadcastBlockchain(gp)

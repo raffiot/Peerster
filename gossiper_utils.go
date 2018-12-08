@@ -63,8 +63,6 @@ type Gossiper struct {
 	search_matches     SearchMatches
 	pending_search     PendingSearches
 	blockchain		   Blockchain
-	pending_tx		   PendingTx
-	file_mapping	   FileMapping
 	lonely_blocks	   LonelyBlocks
 }
 
@@ -254,6 +252,8 @@ type Blockchain struct{
 	Longest	[]*BlockWithLink
 	All_c	map[string][]*BlockWithLink
 	All_b	map[string]*BlockWithLink
+	FileMapping	map[string][]byte
+	Pending		[]TxPublish
 	m		sync.RWMutex
 }
 
@@ -263,16 +263,6 @@ type BlockWithLink struct{
 	bl Block
 	prev	*BlockWithLink
 	next	[]*BlockWithLink
-}
-
-type PendingTx struct {
-	Pending		[]TxPublish
-	m			sync.RWMutex
-}
-
-type FileMapping struct {
-	FileMapping		map[string][]byte
-	m				sync.RWMutex
 }
 
 type LonelyBlocks struct {
@@ -363,37 +353,26 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		m:	mutex8,
 	}
 
-	/**
-	var tab_blockc []Block
-	var mutex9 = sync.RWMutex{}
-	var blockchain = Blockchain{
-		Blockchain: tab_blockc,
-		m: mutex9,
-	}*/
+
 	var longest []*BlockWithLink
 	var all_c = make(map[string][]*BlockWithLink)
 	var all_b = make(map[string]*BlockWithLink)
+	var filem = make(map[string][]byte)
+	var ptx []TxPublish
 	var mutex9 = sync.RWMutex{}
 	var blockchain = Blockchain{
 		Longest: longest,
 		All_c: all_c,
 		All_b: all_b,
+		FileMapping: filem,
+		Pending: ptx,
 		m: mutex9,
 	}
 	
-	var ptx []TxPublish
-	var mutex10 = sync.RWMutex{}
-	var pending_tx = PendingTx{
-		Pending: ptx,
-		m: mutex10,
-	}
 	
-	var filem = make(map[string][]byte)
-	var mutex11 = sync.RWMutex{}
-	var file_mapping = FileMapping{
-		FileMapping: filem,
-		m: mutex11,
-	}
+	
+	
+
 	
 	var lonelys	 = make(map[string]*Block)
 	var mutex12 = sync.RWMutex{}
@@ -420,8 +399,6 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		search_matches:     search_matches,
 		pending_search:     ps,
 		blockchain:			blockchain,
-		pending_tx:			pending_tx,
-		file_mapping:		file_mapping,
 		lonely_blocks:		lonely_blocks,
 	}
 }
@@ -573,7 +550,7 @@ func arrayToString(a []uint64, delim string) string {
 }
 
 func printForkShorter(a [32]byte){
-	fmt.Println("FORK SHORTER "+hex.EncodeToString(a[:]))
+	fmt.Println("FORK-SHORTER "+hex.EncodeToString(a[:]))
 }
 
 func printForkLonger(a int){

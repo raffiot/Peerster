@@ -36,21 +36,23 @@ do
 	name=$(echo "$name" | tr "A-Y" "B-Z")
 done
 
+sleep 2
+
 ./client/client -UIPort=12345 -file=test.txt
 #"715b1934521a0215b180986cdd931782a8381c58c18a9e6e7f4bfd149afd4a61"
 ./client/client -UIPort=12345 -file=rimbaud.txt
-sleep 5
+sleep 9
 
 pkill -f Peerster
 
 
-failed="T"
-echo -e "${RED}###CHECK FOUND-BLOCK IN AT LEAST ONE OF THE OUTPUT FILE${NC}"
+failed="F"
+echo -e "${RED}###CHECK FOUND-BLOCK IN ALL OUTPUT FILE${NC}"
 for i in `seq 0 5`;
 do
 	echo -e "${outputFiles[$i]}"
-    if (grep -q "FOUND-BLOCK" "${outputFiles[$i]}") ; then
-        failed="F"
+    if !(grep -q "FOUND-BLOCK" "${outputFiles[$i]}") ; then
+        failed="T"
     fi
 done
 
