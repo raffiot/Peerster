@@ -184,7 +184,7 @@ func (g *Gossiper) requestFileFromSearch(pkt *FileMessage) {
 	tmp, _ := hex.DecodeString(pkt.Request)
 	var sm SearchMatch
 	found := false	
-	g.search_matches.m.Lock()
+	g.search_matches.m.RLock()
 	for _,match := range g.search_matches.sm {
 		if bytes.Equal(match.MetafileHash,tmp) {
 			sm = match
@@ -192,7 +192,7 @@ func (g *Gossiper) requestFileFromSearch(pkt *FileMessage) {
 			break
 		}
 	}
-	g.search_matches.m.Unlock()
+	g.search_matches.m.RUnlock()
 	if !found {
 		fmt.Println("No search match this request")
 		return

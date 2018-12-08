@@ -172,10 +172,6 @@ func (g *Gossiper) search_packet_handler(pkt *SearchRequest){
 	g.pending_search.ps = append(g.pending_search.ps,ps)
 	g.pending_search.m.Unlock()
 
-	//g.search_matches.m.Lock()
-	//g.search_matches.sm = sm //Clear old search_matches
-	//g.search_matches.m.Unlock()
-
 	pkt.Origin = g.Name 
 	if pkt.Budget == 0 {
 		go g.search_routine(pkt,ch)

@@ -56,10 +56,10 @@ func (g *Gossiper) checkMatchComplete(matches map[string][]uint64, chunkCount ui
 
 
 func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
-	g.search_matches.m.Lock()
+	g.search_matches.m.RLock()
 	sm_copy := make([]SearchMatch, len(g.search_matches.sm))
 	copy(sm_copy,g.search_matches.sm)
-	g.search_matches.m.Unlock()
+	g.search_matches.m.RUnlock()
 
 	if len(pkt.Results) == 0 {
 		return
@@ -76,6 +76,7 @@ func (g *Gossiper) search_reply_for_me(pkt *SearchReply) {
 		for i, match := range sm_copy {
 			if bytes.Equal(match.MetafileHash, searchResultIn.MetafileHash) {
 				new_file = false
+
 				alreadyComplete := g.checkMatchComplete(g.search_matches.sm[i].Matches,searchResultIn.ChunkCount)
 				g.search_matches.sm[i].Matches[pkt.Origin] = searchResultIn.ChunkMap
 				if !alreadyComplete {

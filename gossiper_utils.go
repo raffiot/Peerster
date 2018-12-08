@@ -69,7 +69,7 @@ type Gossiper struct {
 type Rumor_state struct {
 	vector_clock       []PeerStatus
 	archives           []PeerMessage
-	m		   sync.Mutex
+	m		   sync.RWMutex
 }
 
 type Private_state struct {
@@ -199,7 +199,7 @@ type SearchMatch struct {
 
 type SearchMatches struct {
 	sm		[]SearchMatch
-	m		sync.Mutex
+	m		sync.RWMutex
 }
 
 type PendingSearches struct {
@@ -291,7 +291,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 
 
 	var sm []SearchMatch
-	var mutex = sync.Mutex{}
+	var mutex = sync.RWMutex{}
 	var search_matches = SearchMatches{
 		sm: sm,
 		m: mutex,
@@ -330,7 +330,7 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 		m:	mutex3,
 	}
 	
-	var mutex6 = sync.Mutex{}
+	var mutex6 = sync.RWMutex{}
 	var s []PeerStatus
 	var a []PeerMessage
 	var rumor_state = Rumor_state{

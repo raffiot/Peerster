@@ -80,10 +80,10 @@ func MessageHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method == "GET" {
 		var values []RumorMessage
 
-		me.rumor_state.m.Lock()
+		me.rumor_state.m.RLock()
 		my_message := make([]PeerMessage,len(me.rumor_state.archives))
 		copy(my_message,me.rumor_state.archives)
-		me.rumor_state.m.Unlock()
+		me.rumor_state.m.RUnlock()
 
 		for i := 0; i < len(my_message); i++ {
 			finished := false

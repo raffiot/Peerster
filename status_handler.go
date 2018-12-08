@@ -40,7 +40,7 @@ func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 
 	vco := pkt.Want
 	var vcm []PeerStatus
-	g.rumor_state.m.Lock()
+	g.rumor_state.m.RLock()
 	for i := 0; i < len(g.rumor_state.vector_clock); i++ {
 		p := PeerStatus{
 			Identifier: g.rumor_state.vector_clock[i].Identifier,
@@ -48,7 +48,7 @@ func (g *Gossiper) StatusPacketRoutine(pkt *StatusPacket, sender *net.UDPAddr) {
 		}
 		vcm = append(vcm, p)
 	}
-	g.rumor_state.m.Unlock()
+	g.rumor_state.m.RUnlock()
 	//vcm := g.vector_clock
 
 	numberToAsk := 0
@@ -142,10 +142,10 @@ We send the rumor messages from a specific origin the sender doesn't have yet
 */
 func (g *Gossiper) sendUpdate(pDefault PeerStatus, sender *net.UDPAddr) {
 
-	g.rumor_state.m.Lock()
+	g.rumor_state.m.RLock()
 	my_message := make([]PeerMessage,len(g.rumor_state.archives))
 	copy(my_message,g.rumor_state.archives)
-	g.rumor_state.m.Unlock()
+	g.rumor_state.m.RUnlock()
 
 	for i := 0; i < len(my_message); i++ {
 		if my_message[i].Identifier == pDefault.Identifier {

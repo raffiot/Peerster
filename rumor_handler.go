@@ -66,7 +66,7 @@ func (g *Gossiper) sendRouteRumor(dst *net.UDPAddr) {
 	var index int
 	isFirstMessage := true
 
-	g.rumor_state.m.Lock()
+	g.rumor_state.m.RLock()
 	for i := 0; i < len(g.rumor_state.archives); i++ {
 		if g.rumor_state.archives[i].Identifier == g.Name {
 			newID = uint32(len(g.rumor_state.archives[i].msgs) + 1)
@@ -74,7 +74,7 @@ func (g *Gossiper) sendRouteRumor(dst *net.UDPAddr) {
 			isFirstMessage = false
 		}
 	}
-	g.rumor_state.m.Unlock()
+	g.rumor_state.m.RUnlock()
 
 	if isFirstMessage {
 		a := make(map[uint32]*RumorMessage)
