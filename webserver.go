@@ -157,7 +157,9 @@ func PeerHandler(w http.ResponseWriter, r *http.Request) {
 		//mutex.Lock()
 		keys := make([]string, 0, len(me.dsdv.state))
 		for k := range me.dsdv.state {
-			keys = append(keys, k)
+			if k != me.Name {
+				keys = append(keys, k)
+			}
 		}
 		//mutex.Unlock()
 		jsonValue, _ := json.Marshal(keys)
