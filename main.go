@@ -13,7 +13,7 @@ import (
 )
 
 var UDP_PACKET_SIZE = 2048
-var ANTI_ENTROPY_TIMER = 10 //Second
+var ANTI_ENTROPY_TIMER = 3 //Second
 var TIMEOUT_TIMER = 2      //Second
 var TIMEOUT_FILE = 5       //Second
 var SLEEP_FIRST_BLOCK = 5

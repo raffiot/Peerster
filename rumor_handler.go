@@ -61,7 +61,6 @@ func (g *Gossiper) sendingRoutine(pkt *RumorMessage, dst *net.UDPAddr) {
 }
 
 func (g *Gossiper) sendRouteRumor(dst *net.UDPAddr) {
-
 	newID := uint32(1)
 	var index int
 	isFirstMessage := true
@@ -181,8 +180,8 @@ func (g *Gossiper) updateArchivesVC(pkt *RumorMessage, sender *net.UDPAddr) (boo
 		})
 		g.rumor_state.m.Unlock()
 	}
-
-	if !alreadyHave && ParseIPStr(sender) != ParseIPStr(g.udp_address) {
+	//&& ParseIPStr(sender) != ParseIPStr(g.udp_address) 
+	if !alreadyHave {
 		g.dsdv.m.Lock()
 		g.dsdv.state[pkt.Origin] = ParseIPStr(sender)
 		g.dsdv.m.Unlock()

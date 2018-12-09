@@ -194,7 +194,7 @@ func (g *Gossiper) receive_search_request(pkt *SearchRequest) {
 					g.conn.WriteToUDP(pktByte, ParseStrIP(next_hop))
 					mutex.Unlock()
 				} else {
-					fmt.Println("destination unknown for search reply message")
+					fmt.Println("destination"+pkt.Origin+" unknown for search reply message")
 				}
 			}
 		}

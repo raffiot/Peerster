@@ -65,10 +65,12 @@ func (g *Gossiper) block_receive(pkt *BlockPublish){
 	hash_block_rcv_str := hex.EncodeToString(hash_block_rcv[:]) 
 	hash_prev_rcv_str := hex.EncodeToString(hash_prev_rcv[:]) 
 	
-	g.blockchain.m.RLock()
+	g.blockchain.m.Lock()
 	_,have_prev := g.blockchain.All_b[hash_prev_rcv_str]	
-	_,already_seen := g.blockchain.All_b[hash_block_rcv_str]
-	g.blockchain.m.RUnlock()
+	//_,already_seen := g.blockchain.All_b[hash_block_rcv_str]
+	_,already_seen := g.blockchain.already_seen[hash_block_rcv_str]
+	g.blockchain.already_seen[hash_block_rcv_str] = true
+	g.blockchain.m.Unlock()
 	
 	
 	//have_prev = have_prev || (bytes.Equal(hash_prev_rcv[:],empty_test_32) && len(g.blockchain.Longest) ==0)
@@ -219,7 +221,9 @@ func (g * Gossiper) update_blockchain(bl Block){
 					
 				} else {
 					common_ancestor,_ := findCommonAncestor(g.blockchain.Longest[len(g.blockchain.Longest)-1],tb)
-					printForkShorter(common_ancestor.Hash())
+					if common_ancestor != nil{
+						printForkShorter(common_ancestor.Hash())
+					}
 				}
 			} else { //We create our own chain
 				g.blockchain.m.RLock()
@@ -250,7 +254,9 @@ func (g * Gossiper) update_blockchain(bl Block){
 						g.rollBack(new_chain)
 					} else {
 						common_ancestor,_ := findCommonAncestor(g.blockchain.Longest[len(g.blockchain.Longest)-1],new_chain)
-						printForkShorter(common_ancestor.Hash())
+						if common_ancestor != nil{
+							printForkShorter(common_ancestor.Hash())
+						}
 					}
 					
 				}
@@ -362,8 +368,7 @@ func (g *Gossiper) rollBack(new_longest []*BlockWithLink){
 	
 	common_ancestor,counter := findCommonAncestor(longest_node,new_longest)
 	if common_ancestor == nil {
-		fmt.Println("Error, no common ancestor")
-		return
+		fmt.Println("No common ancestor on rollback")
 	}
 	printForkLonger(counter)
 
@@ -434,7 +439,6 @@ func (g *Gossiper) extendChain(tab []*BlockWithLink, block Block) ([]*BlockWithL
 	g.blockchain.m.Lock()
 	
 	tab = append(tab, blockL)
-	fmt.Println("Here")
 	g.blockchain.All_b[hash_bl_str] = blockL
 	_,ok := g.blockchain.All_c[hash_prev_str]
 	if ok{

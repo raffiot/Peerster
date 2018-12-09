@@ -16,6 +16,8 @@ import (
 
 func (g *Gossiper) loadFile(filename string) {
 
+	fmt.Println("REQUESTING INDEXING filename " +filename) 
+
 	if filename == "" {
 		fmt.Println("error filename in empty")
 		return
@@ -92,7 +94,6 @@ func (g *Gossiper) loadFile(filename string) {
 func (g *Gossiper) receive_file_request_for_me(pkt *DataRequest) {
 
 	// We send a nil data if we don't have file.
-	fmt.Println("receive request")
 	file_id := hex.EncodeToString(pkt.HashValue)
 
 	var buf []byte
@@ -249,6 +250,8 @@ func (g *Gossiper) requestFileFromSearch(pkt *FileMessage) {
 }
 
 func (g *Gossiper) requestFile(pkt *FileMessage) {
+
+	fmt.Println("REQUESTING filename "+pkt.Filename+" from "+pkt.Destination+" hash "+pkt.Request)
 
 	tmp, _ := hex.DecodeString(pkt.Request)
 

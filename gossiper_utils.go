@@ -252,6 +252,7 @@ type Blockchain struct{
 	Longest	[]*BlockWithLink
 	All_c	map[string][]*BlockWithLink
 	All_b	map[string]*BlockWithLink
+	already_seen	map[string]bool
 	FileMapping	map[string][]byte
 	Pending		[]TxPublish
 	m		sync.RWMutex
@@ -358,12 +359,14 @@ func NewGossiper(address string, name string, peers []string, simple bool, clien
 	var all_c = make(map[string][]*BlockWithLink)
 	var all_b = make(map[string]*BlockWithLink)
 	var filem = make(map[string][]byte)
+	var already_seen = make(map[string]bool)
 	var ptx []TxPublish
 	var mutex9 = sync.RWMutex{}
 	var blockchain = Blockchain{
 		Longest: longest,
 		All_c: all_c,
 		All_b: all_b,
+		already_seen: already_seen,
 		FileMapping: filem,
 		Pending: ptx,
 		m: mutex9,
@@ -505,7 +508,7 @@ func (g *Gossiper) printDSDV() {
 
 func downloadPrint(filename string, chunk_nb int, origin string) {
 	if chunk_nb >= 0 {
-		str := fmt.Sprint(chunk_nb)
+		str := fmt.Sprint(chunk_nb +1)
 		fmt.Println("DOWNLOADING " + filename + " chunk " + str + " from " + origin)
 	} else if chunk_nb == -1 {
 		fmt.Println("RECONSTRUCTED file " + filename)
